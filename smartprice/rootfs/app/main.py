@@ -1526,9 +1526,14 @@ class VehicleMonitor:
                     self._poll_vehicles()
                 except Exception as e:
                     _log("error", f"Vehicle polling error: {e}")
-                time.sleep(self.poll_interval_minutes * 60)
+                # Poll alle 60 Sekunden um frische Daten vom VehicleManager zu holen
+                # (Der VehicleManager selbst pollt die APIs nur alle 30 min)
+                time.sleep(60)
         
-        # Initialer Poll sofort
+        # Warte kurz damit VehicleManager starten kann
+        time.sleep(2)
+        
+        # Initialer Poll
         self._poll_vehicles()
         
         threading.Thread(target=poll_loop, daemon=True).start()
@@ -2277,7 +2282,7 @@ class SimpleAPIServer:
 </head>
 <body>
     <div class="container">
-        <h1>⚡ SmartPrice v2.4.0</h1>
+        <h1>⚡ SmartPrice v2.6.4</h1>
         
         <div class="card">
             <h2>📊 Aktueller Status</h2>
@@ -2678,7 +2683,7 @@ class SimpleAPIServer:
 
 def main():
     _log("info", "=" * 70)
-    _log("info", "  SmartPrice v2.0.1 - Hybrid LP + Shadow RL")
+    _log("info", "  SmartPrice v2.6.4 - Hybrid LP + Shadow RL")
     _log("info", "=" * 70)
     _log("info", "  LP Optimizer:  PRODUCTION (steuert evcc)")
     _log("info", "  Shadow RL:     LEARNING (beobachtet, vergleicht)")
