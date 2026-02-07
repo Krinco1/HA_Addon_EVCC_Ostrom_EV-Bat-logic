@@ -14,6 +14,13 @@ from .base import VehicleProvider, VehicleData
 
 logger = logging.getLogger(__name__)
 
+def _log(level: str, msg: str) -> None:
+    """Simple logging."""
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] [{level.upper():5}] {msg}", flush=True)
+
+
 # Try to import the library
 try:
     from hyundai_kia_connect_api import VehicleManager, Vehicle
@@ -21,7 +28,7 @@ try:
     HAS_KIA_API = True
 except ImportError:
     HAS_KIA_API = False
-    logger.warning("hyundai_kia_connect_api not installed. KIA provider disabled.")
+    _log("warning", "hyundai_kia_connect_api not installed. KIA provider disabled.")
 
 
 class KiaProvider(VehicleProvider):
@@ -100,7 +107,7 @@ class KiaProvider(VehicleProvider):
             return False
         
         try:
-            logger.info(f"[{self.PROVIDER_NAME}] Authenticating {self.user}...")
+            _log("info", f"[{self.PROVIDER_NAME}] Authenticating {self.user}...")
             
             # Create vehicle manager
             self._manager = VehicleManager(
@@ -131,7 +138,7 @@ class KiaProvider(VehicleProvider):
                     self._vehicle = list(self._manager.vehicles.values())[0]
                 
                 if self._vehicle:
-                    logger.info(f"[{self.PROVIDER_NAME}] Authenticated! Vehicle: {self._vehicle.name} ({self._vehicle.VIN})")
+                    _log("info", f"[{self.PROVIDER_NAME}] Authenticated! Vehicle: {self._vehicle.name} ({self._vehicle.VIN})")
                     return True
                 else:
                     self._last_error = f"Vehicle with VIN {self.vin} not found"
@@ -142,7 +149,7 @@ class KiaProvider(VehicleProvider):
             
         except Exception as e:
             self._last_error = f"Auth failed: {e}"
-            logger.error(f"[{self.PROVIDER_NAME}] {self._last_error}")
+            _log("error", f"[{self.PROVIDER_NAME}] {self._last_error}")
             return False
     
     async def fetch_vehicle_data(self) -> Optional[VehicleData]:
@@ -217,7 +224,7 @@ class KiaProvider(VehicleProvider):
             
         except Exception as e:
             self._last_error = f"Fetch failed: {e}"
-            logger.error(f"[{self.PROVIDER_NAME}] {self._last_error}")
+            _log("error", f"[{self.PROVIDER_NAME}] {self._last_error}")
             return None
     
     async def force_refresh(self) -> Optional[VehicleData]:
@@ -229,7 +236,7 @@ class KiaProvider(VehicleProvider):
             return None
         
         try:
-            logger.info(f"[{self.PROVIDER_NAME}] Forcing refresh for {self.evcc_name} (this wakes the car!)")
+            _log("info", f"[{self.PROVIDER_NAME}] Forcing refresh for {self.evcc_name} (this wakes the car!)")
             
             loop = asyncio.get_event_loop()
             
@@ -248,7 +255,7 @@ class KiaProvider(VehicleProvider):
             
         except Exception as e:
             self._last_error = f"Force refresh failed: {e}"
-            logger.error(f"[{self.PROVIDER_NAME}] {self._last_error}")
+            _log("error", f"[{self.PROVIDER_NAME}] {self._last_error}")
             return None
 
 

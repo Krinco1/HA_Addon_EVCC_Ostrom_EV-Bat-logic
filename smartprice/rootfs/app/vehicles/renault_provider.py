@@ -14,6 +14,13 @@ from .base import VehicleProvider, VehicleData
 
 logger = logging.getLogger(__name__)
 
+def _log(level: str, msg: str) -> None:
+    """Simple logging."""
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] [{level.upper():5}] {msg}", flush=True)
+
+
 # Try to import the library
 try:
     from renault_api.renault_client import RenaultClient
@@ -22,7 +29,7 @@ try:
     HAS_RENAULT_API = True
 except ImportError:
     HAS_RENAULT_API = False
-    logger.warning("renault-api not installed. Renault provider disabled.")
+    _log("warning", "renault-api not installed. Renault provider disabled.")
 
 
 class RenaultProvider(VehicleProvider):
@@ -74,16 +81,16 @@ class RenaultProvider(VehicleProvider):
             return False
         
         try:
-            logger.info(f"[{self.PROVIDER_NAME}] Authenticating {self.user}...")
+            _log("info", f"[{self.PROVIDER_NAME}] Authenticating {self.user}...")
             
             # Store credentials for later use
             self._authenticated = True
-            logger.info(f"[{self.PROVIDER_NAME}] Credentials stored, will authenticate on first fetch")
+            _log("info", f"[{self.PROVIDER_NAME}] Credentials stored, will authenticate on first fetch")
             return True
                     
         except Exception as e:
             self._last_error = f"Auth failed: {e}"
-            logger.error(f"[{self.PROVIDER_NAME}] {self._last_error}")
+            _log("error", f"[{self.PROVIDER_NAME}] {self._last_error}")
             return False
     
     async def fetch_vehicle_data(self) -> Optional[VehicleData]:
@@ -159,7 +166,7 @@ class RenaultProvider(VehicleProvider):
                 except:
                     pass
                 
-                logger.info(f"[{self.PROVIDER_NAME}] Got SoC={soc}% for {self.evcc_name}")
+                _log("info", f"[{self.PROVIDER_NAME}] Got SoC={soc}% for {self.evcc_name}")
                 
                 return VehicleData(
                     soc=soc,
@@ -175,7 +182,7 @@ class RenaultProvider(VehicleProvider):
                 
         except Exception as e:
             self._last_error = f"Fetch failed: {e}"
-            logger.error(f"[{self.PROVIDER_NAME}] {self._last_error}")
+            _log("error", f"[{self.PROVIDER_NAME}] {self._last_error}")
             return None
 
 

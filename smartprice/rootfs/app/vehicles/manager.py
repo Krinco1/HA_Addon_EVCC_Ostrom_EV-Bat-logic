@@ -13,6 +13,13 @@ from typing import Dict, List, Optional, Type
 
 from .base import VehicleProvider, VehicleData, VehicleState
 
+
+def _log(level: str, msg: str) -> None:
+    """Simple logging that works with Home Assistant."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] [{level.upper():5}] {msg}", flush=True)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,7 +72,7 @@ class VehicleManager:
         # Initialize providers from config
         self._init_providers(config.get("providers", []))
         
-        logger.info(f"VehicleManager initialized with {len(self._providers)} providers")
+        _log("info", f"VehicleManager initialized with {len(self._providers)} providers")
     
     def _register_builtin_providers(self):
         """Register all built-in provider classes."""
@@ -87,7 +94,7 @@ class VehicleManager:
     def register_provider(self, name: str, provider_class: Type[VehicleProvider]):
         """Register a custom provider class."""
         self._provider_classes[name.lower()] = provider_class
-        logger.info(f"Registered provider: {name}")
+        _log("info", f"Registered provider: {name}")
     
     def _init_providers(self, provider_configs: List[dict]):
         """Initialize providers from config."""
@@ -97,18 +104,18 @@ class VehicleManager:
                 provider_type = cfg.get("type", "manual").lower()
                 
                 if not evcc_name:
-                    logger.warning(f"Provider config missing evcc_name: {cfg}")
+                    _log("warning", f"Provider config missing evcc_name: {cfg}")
                     continue
                 
                 if provider_type not in self._provider_classes:
-                    logger.warning(f"Unknown provider type: {provider_type}")
+                    _log("warning", f"Unknown provider type: {provider_type}")
                     provider_type = "manual"
                 
                 provider_class = self._provider_classes[provider_type]
                 
                 # Check if provider library is available
                 if hasattr(provider_class, 'is_available') and not provider_class.is_available():
-                    logger.warning(f"Provider {provider_type} not available (missing library)")
+                    _log("warning", f"Provider {provider_type} not available (missing library)")
                     # Fallback to evcc provider
                     provider_class = self._provider_classes["evcc"]
                     cfg["evcc_host"] = self.evcc_host
@@ -131,10 +138,10 @@ class VehicleManager:
                     provider_available=True
                 )
                 
-                logger.info(f"Initialized {provider_type} provider for {evcc_name}")
+                _log("info", f"Initialized {provider_type} provider for {evcc_name}")
                 
             except Exception as e:
-                logger.error(f"Failed to init provider: {e}")
+                _log("error", f"Failed to init provider: {e}")
     
     async def refresh_vehicle(self, evcc_name: str, force: bool = False) -> Optional[VehicleState]:
         """
@@ -148,13 +155,13 @@ class VehicleManager:
             Updated VehicleState or None
         """
         if evcc_name not in self._providers:
-            logger.warning(f"No provider for vehicle: {evcc_name}")
+            _log("warning", f"No provider for vehicle: {evcc_name}")
             return None
         
         provider = self._providers[evcc_name]
         state = self._states.get(evcc_name)
         
-        logger.info(f"[{provider.PROVIDER_NAME}] Fetching data for {evcc_name}...")
+        _log("info", f"[{provider.PROVIDER_NAME}] Fetching data for {evcc_name}...")
         
         try:
             # Try direct API first
@@ -166,27 +173,27 @@ class VehicleManager:
                 state.provider_authenticated = provider._authenticated
                 state.last_error = None
                 state.consecutive_errors = 0
-                logger.info(f"[{provider.PROVIDER_NAME}] ✓ Got SoC={data.soc}% for {evcc_name}")
+                _log("info", f"[{provider.PROVIDER_NAME}] ✓ Got SoC={data.soc}% for {evcc_name}")
             else:
-                logger.info(f"[{provider.PROVIDER_NAME}] No data from API, trying evcc fallback...")
+                _log("info", f"[{provider.PROVIDER_NAME}] No data from API, trying evcc fallback...")
                 # Fallback to evcc if connected
                 evcc_data = await self._get_from_evcc(evcc_name)
                 if evcc_data and evcc_data.soc is not None:
                     state.data = evcc_data
                     state.data_source = "evcc"
                     state.evcc_connected = True
-                    logger.info(f"[{provider.PROVIDER_NAME}] Got SoC={evcc_data.soc}% for {evcc_name} from evcc")
+                    _log("info", f"[{provider.PROVIDER_NAME}] Got SoC={evcc_data.soc}% for {evcc_name} from evcc")
                 elif state.data:
                     # Keep cached data
                     state.data_source = "cache"
-                    logger.debug(f"Using cached SoC={state.data.soc}% for {evcc_name}")
+                    _log("debug", f"Using cached SoC={state.data.soc}% for {evcc_name}")
                 else:
                     state.data_source = "unknown"
             
             state.last_error = provider._last_error
             
         except Exception as e:
-            logger.error(f"Error refreshing {evcc_name}: {e}")
+            _log("error", f"Error refreshing {evcc_name}: {e}")
             state.last_error = str(e)
             state.consecutive_errors += 1
         
@@ -214,14 +221,14 @@ class VehicleManager:
         Returns:
             Dict of evcc_name -> VehicleState
         """
-        logger.info(f"Refreshing {len(self._providers)} vehicle providers...")
+        _log("info", f"Refreshing {len(self._providers)} vehicle providers...")
         
         for name in self._providers.keys():
-            logger.info(f"  Refreshing {name}...")
+            _log("info", f"  Refreshing {name}...")
             try:
                 await self.refresh_vehicle(name, force=force)
             except Exception as e:
-                logger.error(f"  Error refreshing {name}: {e}")
+                _log("error", f"  Error refreshing {name}: {e}")
         
         # Update evcc connection status
         await self._update_evcc_status()
@@ -298,7 +305,7 @@ class VehicleManager:
         self._running = True
         self._poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._poll_thread.start()
-        logger.info(f"Vehicle polling started (interval: {self.poll_interval_minutes}min)")
+        _log("info", f"Vehicle polling started (interval: {self.poll_interval_minutes}min)")
     
     def stop_polling(self):
         """Stop background polling."""
@@ -308,11 +315,11 @@ class VehicleManager:
     
     def _poll_loop(self):
         """Background polling loop."""
-        logger.info("Vehicle poll loop started")
+        _log("info", "Vehicle poll loop started")
         
         while self._running:
             try:
-                logger.info("Starting vehicle API poll...")
+                _log("info", "Starting vehicle API poll...")
                 
                 # Run async refresh in new event loop
                 loop = asyncio.new_event_loop()
@@ -320,17 +327,17 @@ class VehicleManager:
                 
                 try:
                     loop.run_until_complete(self.refresh_all())
-                    logger.info("Vehicle poll completed successfully")
+                    _log("info", "Vehicle poll completed successfully")
                 except Exception as e:
-                    logger.error(f"Error in refresh_all: {e}")
+                    _log("error", f"Error in refresh_all: {e}")
                 finally:
                     loop.close()
                 
             except Exception as e:
-                logger.error(f"Poll loop error: {e}")
+                _log("error", f"Poll loop error: {e}")
             
             # Sleep in small increments so we can stop quickly
-            logger.debug(f"Sleeping {self.poll_interval_minutes} minutes until next poll")
+            _log("debug", f"Sleeping {self.poll_interval_minutes} minutes until next poll")
             for _ in range(self.poll_interval_minutes * 60):
                 if not self._running:
                     break
