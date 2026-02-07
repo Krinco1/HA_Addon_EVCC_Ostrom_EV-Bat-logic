@@ -1566,7 +1566,11 @@ class VehicleMonitor:
         if self._vehicle_manager:
             try:
                 vm_states = self._vehicle_manager.get_all_vehicles()
+                _log("debug", f"VehicleManager returned {len(vm_states)} vehicles")
+                
                 for name, state in vm_states.items():
+                    _log("debug", f"  {name}: has_valid_soc={state.has_valid_soc}, soc={state.soc}, data_source={state.data_source}")
+                    
                     if state.has_valid_soc:
                         old_status = self.vehicles.get(name)
                         
@@ -1617,25 +1621,17 @@ class VehicleMonitor:
         
         # Fahrzeuge aus evcc vehicles hinzufügen (wenn nicht schon vom VehicleManager)
         for name, data in vehicles_data.items():
-            # Wenn schon frische Daten vom VehicleManager, nicht überschreiben
+            # Wenn schon Daten vom VehicleManager mit validem SoC, nicht überschreiben
             if name in self.vehicles:
                 existing = self.vehicles[name]
-                # Robuster Timestamp-Vergleich
-                try:
-                    last_upd = existing.last_update
-                    if isinstance(last_upd, str):
-                        last_upd = datetime.fromisoformat(last_upd.replace("Z", "+00:00"))
-                    if last_upd.tzinfo is None:
-                        last_upd = last_upd.replace(tzinfo=timezone.utc)
-                    is_fresh = existing.data_source == "direct_api" and last_upd > now - timedelta(minutes=5)
-                except:
-                    is_fresh = False
-                    
-                if is_fresh:
+                
+                # Wenn wir Daten von direct_api haben, behalte sie
+                if existing.data_source == "direct_api" and existing.soc > 0:
                     # Nur connected-Status aktualisieren
                     if name in connected_vehicles:
                         existing.connected_to_wallbox = True
                         existing.charging = connected_vehicles[name].get("charging", False)
+                    _log("debug", f"Keeping direct_api data for {name}: SoC={existing.soc}%")
                     continue
             
             soc = data.get("soc", 0)
