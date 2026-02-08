@@ -1,0 +1,168 @@
+name: "EVCC-Smartload - Hybrid Optimizer"
+slug: evcc_smartload
+version: "3.0.0"
+description: "LP Optimizer + Shadow RL + Pro-Device Control + Modulares Vehicle-System"
+url: "https://github.com/Krinco1/HA_Addon_EVCC-Smartload"
+arch:
+  - aarch64
+  - armv7
+  - amd64
+init: false
+startup: services
+boot: auto
+
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: "EVCC-Smartload API & Dashboard"
+webui: "http://[HOST]:[PORT:8099]/"
+
+options:
+  # ============================================================
+  # EVCC
+  # ============================================================
+  evcc_url: "http://192.168.1.66:7070"
+  evcc_password: ""
+
+  # ============================================================
+  # INFLUXDB (HA Add-on)
+  # ============================================================
+  influxdb_host: "192.168.1.67"
+  influxdb_port: 8086
+  influxdb_database: "smartprice"
+  influxdb_username: "smartprice"
+  influxdb_password: "smartprice"
+
+  # ============================================================
+  # BATTERIE
+  # ============================================================
+  battery_capacity_kwh: 33.1
+  battery_charge_power_kw: 4.3
+  battery_max_price_ct: 25.0       # Absolutes Maximum
+  battery_min_soc: 10
+  battery_max_soc: 90
+  battery_price_corridor_ct: 0.8   # Basis-Korridor zum Bestpreis
+
+  # ============================================================
+  # EV
+  # ============================================================
+  ev_max_price_ct: 30.0
+  ev_target_soc: 80
+  ev_default_energy_kwh: 30.0
+  ev_price_corridor_ct: 1.0        # Basis-Korridor für EV
+  ev_charge_deadline_hour: 6       # EV soll bis 6:00 Uhr voll sein
+
+  # ============================================================
+  # FEED-IN
+  # ============================================================
+  feed_in_tariff_ct: 7.0
+
+  # ============================================================
+  # SCHEDULING
+  # ============================================================
+  decision_interval_minutes: 15   # Entscheidung alle 15 Min
+  data_collect_interval_sec: 60   # Daten sammeln jede Minute
+
+  # ============================================================
+  # REINFORCEMENT LEARNING (Shadow Mode)
+  # ============================================================
+  rl_enabled: true
+  rl_learning_rate: 0.001
+  rl_discount_factor: 0.95
+  rl_epsilon_start: 0.3
+  rl_epsilon_min: 0.05
+  rl_epsilon_decay: 0.995
+  rl_batch_size: 32
+  rl_memory_size: 10000
+  rl_ready_threshold: 0.8         # 80% Win-Rate für "RL READY"
+  rl_ready_min_comparisons: 200   # Mindestens 200 Vergleiche
+  
+  # Pro-Device RL Control (v3.0)
+  rl_auto_switch: true             # Automatisch zu RL wechseln
+  rl_fallback_threshold: 0.7       # Fallback zu LP wenn < 70%
+
+  # ============================================================
+  # VEHICLE PROVIDERS (Modulares System)
+  # ============================================================
+  # Polling-Intervall für Fahrzeug-APIs (Rate-Limits beachten!)
+  vehicle_poll_interval_minutes: 30
+  
+  # Provider-Konfigurationen (JSON String)
+  # Beispiel:
+  # [
+  #   {
+  #     "evcc_name": "KIA_EV9",
+  #     "type": "kia",
+  #     "user": "email@example.com",
+  #     "password": "secret",
+  #     "capacity_kwh": 99.8
+  #   },
+  #   {
+  #     "evcc_name": "my_Twingo",
+  #     "type": "renault",
+  #     "user": "email@example.com",
+  #     "password": "secret",
+  #     "capacity_kwh": 22
+  #   },
+  #   {
+  #     "evcc_name": "ORA_03",
+  #     "type": "custom",
+  #     "script": "/config/vehicles/ora_script.py",
+  #     "capacity_kwh": 63
+  #   }
+  # ]
+  vehicle_providers: ""
+
+  # ============================================================
+  # API
+  # ============================================================
+  api_port: 8099
+
+schema:
+  evcc_url: str
+  evcc_password: password
+  
+  influxdb_host: str
+  influxdb_port: int
+  influxdb_database: str
+  influxdb_username: str
+  influxdb_password: password
+  
+  battery_capacity_kwh: float
+  battery_charge_power_kw: float
+  battery_max_price_ct: float
+  battery_min_soc: int
+  battery_max_soc: int
+  battery_price_corridor_ct: float
+  
+  ev_max_price_ct: float
+  ev_target_soc: int
+  ev_default_energy_kwh: float
+  ev_price_corridor_ct: float
+  ev_charge_deadline_hour: int
+  
+  feed_in_tariff_ct: float
+  
+  decision_interval_minutes: int
+  data_collect_interval_sec: int
+  
+  rl_enabled: bool
+  rl_learning_rate: float
+  rl_discount_factor: float
+  rl_epsilon_start: float
+  rl_epsilon_min: float
+  rl_epsilon_decay: float
+  rl_batch_size: int
+  rl_memory_size: int
+  rl_ready_threshold: float
+  rl_ready_min_comparisons: int
+  rl_auto_switch: bool
+  rl_fallback_threshold: float
+  
+  vehicle_poll_interval_minutes: int
+  vehicle_providers: str?
+  
+  api_port: int
+
+timezone: "Europe/Berlin"
+log_level: info
