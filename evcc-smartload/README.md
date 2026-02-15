@@ -1,4 +1,4 @@
-# ⚡ EVCC-Smartload v4.3.8
+# ⚡ EVCC-Smartload v4.3.9
 
 **Intelligentes Energiemanagement für Home Assistant**
 
@@ -202,7 +202,7 @@ Basis-URL: `http://homeassistant:8099`
 
 | Endpunkt | Beschreibung |
 |----------|--------------|
-| `/health` | Health-Check (`{"status": "ok", "version": "4.3.8"}`) |
+| `/health` | Health-Check (`{"status": "ok", "version": "4.3.9"}`) |
 | `/status` | Vollständiger System-Status inkl. RL-Metriken |
 | `/vehicles` | Alle Fahrzeuge mit SoC, Datenquelle, manuellem Override |
 | `/slots` | Detaillierte Ladeslots inkl. Batterie→EV Profitabilität |
@@ -238,7 +238,7 @@ Smartload steuert folgende evcc-Parameter automatisch:
 
 ---
 
-## 🏗️ Architektur (v4.3.8)
+## 🏗️ Architektur (v4.3.9)
 
 ```
 rootfs/app/

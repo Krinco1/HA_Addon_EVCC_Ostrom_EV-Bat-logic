@@ -19,7 +19,7 @@ from typing import Dict, List, Optional
 
 from config import Config
 from logging_util import log
-from state import Action, ManualSocStore, SystemState
+from state import Action, ManualSocStore, SystemState, calc_solar_surplus_kwh
 from version import VERSION
 
 from web.template_engine import render as render_template
@@ -503,7 +503,7 @@ class WebServer:
 </style></head><body><div class="c">
 <h1>📚 EVCC-Smartload v{VERSION} Dokumentation</h1>
 <a href="/docs/readme"><div class="card"><h2>📖 README</h2><p>Installation, Konfiguration, Features, API, FAQ</p></div></a>
-<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.8</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
+<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.9</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
 <a href="/docs/api"><div class="card"><h2>🔌 API Referenz</h2><p>Alle Endpunkte mit Beispielen</p></div></a>
 <p style="text-align:center;margin-top:30px;"><a href="/">← Dashboard</a></p>
 </div></body></html>"""
@@ -690,9 +690,11 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles, solar_forecast=N
 
     # --- Battery-to-EV optimization ---
     # Calculate if discharging battery to charge EVs is cheaper than grid
+    # Skip vehicles with 0% SoC from evcc fallback (means "unknown", not "empty")
     total_ev_need = sum(
         max(0, (cfg.ev_target_soc - v.get_effective_soc()) / 100 * v.capacity_kwh)
         for v in vehicles.values()
+        if v.get_effective_soc() > 0 or v.connected_to_wallbox or v.data_source == "direct_api"
     )
     bat_available_kwh = max(0, (bat_soc - cfg.battery_min_soc) / 100 * cfg.battery_capacity_kwh)
     round_trip_eff = cfg.battery_charge_efficiency * cfg.battery_discharge_efficiency
@@ -748,12 +750,8 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles, solar_forecast=N
         floor = cfg.battery_to_ev_floor_soc
         home_kw = (last_state.home_power / 1000) if last_state and last_state.home_power else 1.0
 
-        # Solar surplus estimate
-        solar_surplus_kwh = 0
-        if solar_forecast:
-            for slot in solar_forecast:
-                kw = slot.get("value", 0)
-                solar_surplus_kwh += max(0, kw - home_kw)
+        # Solar surplus estimate (proper kWh with slot duration)
+        solar_surplus_kwh = calc_solar_surplus_kwh(solar_forecast, home_kw)
         solar_refill_pct = min(90, (solar_surplus_kwh / bat_cap) * 100) if bat_cap > 0 else 0
 
         # Cheap grid hours
@@ -765,7 +763,8 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles, solar_forecast=N
         safe_discharge = total_refill_pct * 0.8
         dynamic_floor = max(floor, int(bat_soc - safe_discharge))
 
-        ev_need_pct = (total_ev_need / (bat_cap * round_trip_eff)) * 100 if bat_cap > 0 else 0
+        ev_need_pct_raw = (total_ev_need / (bat_cap * round_trip_eff)) * 100 if bat_cap > 0 else 0
+        ev_need_pct = min(ev_need_pct_raw, 100)  # Can't discharge more than 100%
         buffer_soc = max(floor, int(bat_soc - ev_need_pct), dynamic_floor)
         priority_soc = max(cfg.battery_min_soc, floor - 5)
 

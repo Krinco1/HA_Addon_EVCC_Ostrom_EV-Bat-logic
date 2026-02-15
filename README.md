@@ -1,6 +1,6 @@
 # Home Assistant Add-on: EVCC-Smartload
 
-![Version](https://img.shields.io/badge/version-4.3.8-blue.svg)
+![Version](https://img.shields.io/badge/version-4.3.9-blue.svg)
 ![Supports aarch64 Architecture](https://img.shields.io/badge/aarch64-yes-green.svg)
 ![Supports amd64 Architecture](https://img.shields.io/badge/amd64-yes-green.svg)
 ![Supports armv7 Architecture](https://img.shields.io/badge/armv7-yes-green.svg)
@@ -24,7 +24,7 @@ EVCC-Smartload ist ein intelligentes Energiemanagementsystem für Home Assistant
 - 📊 Live-Dashboard mit Auto-Refresh (Mobile-First)
 - ⚡ Umfangreiche evcc API Integration
 - 📈 Persistenter manueller SoC für Fahrzeuge ohne API
-- 🏗️ Modulare Architektur (v4.3.8)
+- 🏗️ Modulare Architektur (v4.3.9)
 
 ---
 

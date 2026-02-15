@@ -1,5 +1,35 @@
 # Changelog
 
+## v4.3.9 (2026-02-15)
+
+### 🐛 Solar-Berechnung, ORA-Duplikat, 0%-SoC Filter
+
+**Solar-Surplus 54466 kWh → realistische Werte:**
+- Root cause: Forecast-Einträge wurden ohne Slot-Dauer summiert (128 × Rohwert = Unsinn)
+- Neue Helper-Funktion `calc_solar_surplus_kwh()` in state.py:
+  - Berechnet Slot-Dauer aus Zeitstempeln (z.B. 15min oder 1h)
+  - Auto-Erkennung W vs kW (Median > 100 → Watt)
+  - Energie = kW × Stunden pro Slot
+  - Sanity-Cap: max 100 kWh (realistisches 2-Tage-Maximum)
+- Wird sowohl in main.py als auch server.py genutzt
+
+**ORA_03/ora_03 Duplikat endgültig gefixt:**
+- Dedup lief VOR Pre-Registrierung → wurde sofort wieder angelegt
+- Fix: `dedup_case_duplicates()` läuft jetzt NACH Pre-Registration
+- Reihenfolge: 1) Pre-Register aus vehicles.yaml 2) Dedup 3) Main-Loop
+
+**0% SoC Filter für Battery→EV:**
+- KIA meldet 0% über evcc-Fallback wenn API fehlschlägt
+- 0% = "unbekannt", nicht "leer"
+- Fahrzeuge mit 0% SoC werden aus der EV-Bedarf-Berechnung ausgeschlossen
+  (es sei denn: am Wallbox angeschlossen ODER direct_api Quelle)
+- Verhindert falsche "79 kWh EV-Bedarf" Berechnung
+
+**EV-Bedarf > 100% gekappt:**
+- ev_need_pct wird auf max 100% begrenzt (Hausbatterie kann nie mehr als 100% liefern)
+
+---
+
 ## v4.3.8 (2026-02-15)
 
 ### 🔧 Batterie→EV Karte + ORA Duplikat-Fix

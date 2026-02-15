@@ -235,7 +235,7 @@ class Comparator:
                     "rl_total_cost": self.rl_total_cost,
                     "rl_wins": self.rl_wins,
                     "rl_ready": self.rl_ready,
-                    # Per-device stats (v4.3.8)
+                    # Per-device stats (v4.3.9)
                     "device_comparisons": dict(self.device_comparisons),
                     "device_wins": dict(self.device_wins),
                     "device_costs_lp": dict(self.device_costs_lp),
@@ -270,7 +270,7 @@ class Comparator:
             self.rl_wins = data.get("rl_wins", 0)
             self.rl_ready = data.get("rl_ready", False)
 
-            # Per-device stats (added v4.3.8)
+            # Per-device stats (added v4.3.9)
             for k, v in data.get("device_comparisons", {}).items():
                 self.device_comparisons[k] = v
             for k, v in data.get("device_wins", {}).items():
@@ -301,7 +301,6 @@ class RLDeviceController:
         self.cfg = cfg
         self.db_path = DEVICE_CONTROL_DB_PATH
         self._init_db()
-        self._dedup_case_duplicates()
 
     def _init_db(self):
         conn = sqlite3.connect(self.db_path)
@@ -320,7 +319,7 @@ class RLDeviceController:
         conn.commit()
         conn.close()
 
-    def _dedup_case_duplicates(self):
+    def dedup_case_duplicates(self):
         """Remove case-duplicate entries (e.g. 'ORA_03' and 'ora_03')."""
         conn = sqlite3.connect(self.db_path)
         rows = conn.execute("SELECT device_name, comparisons FROM device_control").fetchall()

@@ -1,5 +1,5 @@
 /**
- * EVCC-Smartload Dashboard v4.3.8
+ * EVCC-Smartload Dashboard v4.3.9
  *
  * Fetches /status, /slots, /vehicles, /strategy, /chart-data, /rl-devices
  * Auto-refreshes every 60 seconds.

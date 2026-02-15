@@ -1,5 +1,5 @@
 """
-EVCC-Smartload v4.3.8 – Hybrid LP + Shadow RL Optimizer
+EVCC-Smartload v4.3.9 – Hybrid LP + Shadow RL Optimizer
 
 Entry point. Initialises all components and runs the main decision loop.
 """
@@ -12,7 +12,7 @@ from logging_util import log
 from config import load_config
 from evcc_client import EvccClient
 from influxdb_client import InfluxDBClient
-from state import Action, ManualSocStore, SystemState
+from state import Action, ManualSocStore, SystemState, calc_solar_surplus_kwh
 from optimizer import HolisticOptimizer, EventDetector
 from rl_agent import DQNAgent
 from comparator import Comparator, RLDeviceController
@@ -62,6 +62,9 @@ def main():
         if vname:
             rl_devices.get_device_mode(vname)
             log("info", f"Pre-registered RL device: {vname}")
+
+    # Dedup AFTER pre-registration (catches old DB entries with different case)
+    rl_devices.dedup_case_duplicates()
 
     # --- Start background services ---
     collector.start_background_collection()
@@ -140,6 +143,7 @@ def main():
                 total_ev_need = sum(
                     max(0, (cfg.ev_target_soc - v.get_effective_soc()) / 100 * v.capacity_kwh)
                     for v in all_vehicles.values()
+                    if v.get_effective_soc() > 0 or v.connected_to_wallbox or v.data_source == "direct_api"
                 )
                 if total_ev_need > 1:
                     bat_available = max(0, (state.battery_soc - cfg.battery_min_soc) / 100 * cfg.battery_capacity_kwh)
@@ -149,12 +153,8 @@ def main():
                     savings = grid_ct - bat_cost_ct
 
                     # Solar surplus estimate for refill calculation
-                    solar_surplus_kwh = 0
-                    if solar_forecast:
-                        home_kw = state.home_power / 1000 if state.home_power else 1.0
-                        for slot in solar_forecast:
-                            kw = slot.get("value", 0)
-                            solar_surplus_kwh += max(0, kw - home_kw)
+                    home_kw = state.home_power / 1000 if state.home_power else 1.0
+                    solar_surplus_kwh = calc_solar_surplus_kwh(solar_forecast, home_kw)
 
                     # Count cheap hours remaining
                     cheap_hours = sum(

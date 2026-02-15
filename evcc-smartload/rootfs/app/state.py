@@ -205,3 +205,71 @@ class ManualSocStore:
     def get_all(self) -> Dict:
         with self._lock:
             return self._data.copy()
+
+
+# ---------------------------------------------------------------------------
+# Solar surplus helpers
+# ---------------------------------------------------------------------------
+
+def calc_solar_surplus_kwh(solar_forecast: List[Dict], home_consumption_kw: float = 1.0) -> float:
+    """Calculate expected solar surplus energy in kWh from evcc forecast entries.
+
+    Each forecast entry has 'start' (ISO timestamp) and 'value' (kW production).
+    We compute actual energy by determining the duration of each time slot from
+    the difference between consecutive timestamps.
+
+    Returns the total surplus (production minus home consumption) in kWh.
+    """
+    if not solar_forecast or len(solar_forecast) < 2:
+        return 0.0
+
+    # Parse and sort by start time
+    entries = []
+    for t in solar_forecast:
+        try:
+            s = t.get("start", "")
+            val = float(t.get("value", 0))
+            if val <= 0:
+                continue
+            if s.endswith("Z"):
+                start = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            elif "+" in s:
+                start = datetime.fromisoformat(s)
+            else:
+                start = datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+            entries.append((start, val))
+        except Exception:
+            continue
+
+    if len(entries) < 2:
+        return 0.0
+
+    entries.sort(key=lambda x: x[0])
+
+    # Detect typical slot duration from first gap
+    typical_gap = (entries[1][0] - entries[0][0]).total_seconds() / 3600  # hours
+    if typical_gap <= 0 or typical_gap > 2:
+        typical_gap = 0.25  # default 15 min
+
+    # Auto-detect unit: if median value > 100, probably Watts not kW
+    vals = [v for _, v in entries]
+    median_val = sorted(vals)[len(vals) // 2]
+    unit_factor = 0.001 if median_val > 100 else 1.0  # W → kW conversion
+
+    total_surplus = 0.0
+    for i, (start, val_raw) in enumerate(entries):
+        val_kw = val_raw * unit_factor
+
+        # Determine slot duration
+        if i < len(entries) - 1:
+            gap_h = (entries[i + 1][0] - start).total_seconds() / 3600
+            if gap_h <= 0 or gap_h > 2:
+                gap_h = typical_gap
+        else:
+            gap_h = typical_gap
+
+        surplus_kw = max(0, val_kw - home_consumption_kw)
+        total_surplus += surplus_kw * gap_h
+
+    # Sanity cap: max ~50 kWh per day × 2 days = 100 kWh for residential
+    return min(total_surplus, 100.0)
