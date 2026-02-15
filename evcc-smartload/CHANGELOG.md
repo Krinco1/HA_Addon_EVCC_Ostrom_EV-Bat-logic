@@ -1,5 +1,29 @@
 # Changelog
 
+## v4.3.1 (2026-02-15)
+
+### ☀️ PV-bewusste Ladeplanung & Energiebilanz
+
+**PV-Integration in Ladeplanung:**
+- Slot-Berechnung berücksichtigt jetzt PV-Prognose → Netto-Bedarf statt Brutto
+- Konservative PV-Schätzung: 60% der aktuellen Leistung × verbleibende Sonnenstunden
+- Dashboard zeigt "Netz-Bedarf" mit PV-Offset: "Brutto: 94 kWh, PV spart ~5 kWh"
+
+**Neue Energiebilanz-Karte:**
+- ☀️ PV-Erzeugung, 🏠 Hausverbrauch, 🔌 Netzbezug/-einspeisung, 🔋 Batterie-Leistung
+- Echtzeit-Werte als übersichtliche Kacheln
+
+**Strategie-Text erweitert:**
+- Zeigt jetzt Hausverbrauch im Kontext: "PV: 3.8 kW → 1.7 kW Überschuss (Haus: 2.1 kW)"
+- Grid/Battery Power jetzt in /status API
+
+**KIA-Fix:**
+- Ursache: `vehicles.yaml` wurde nie geladen weil `yaml`-Modul fehlte (v4.3.0 fix)
+- Sobald `pyyaml` installiert ist, werden KIA-Bluelink-Credentials aus vehicles.yaml geladen
+- Direct API überschreibt evcc's 0%-Fallback für nicht-angeschlossene Fahrzeuge
+
+---
+
 ## v4.3.0 (2026-02-15)
 
 ### 🎯 Major Dashboard & RL Update

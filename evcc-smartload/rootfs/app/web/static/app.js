@@ -1,5 +1,5 @@
 /**
- * EVCC-Smartload Dashboard v4.3.0
+ * EVCC-Smartload Dashboard v4.3.1
  *
  * Fetches /status, /slots, /vehicles, /strategy, /chart-data, /rl-devices
  * Auto-refreshes every 60 seconds.
@@ -55,6 +55,7 @@ async function refresh() {
     if (status) renderStatus(status);
     if (strategy) renderStrategy(strategy);
     if (chartData) renderChart(chartData);
+    if (chartData) renderEnergyBalance(chartData);
     if (slots) renderSlots(slots, vehicles);
     if (status) renderRL(status);
     if (rlDevices) renderRLDevices(rlDevices);
@@ -135,6 +136,33 @@ function renderChart(data) {
     }
 }
 
+// ---- Energy Balance ----
+function renderEnergyBalance(data) {
+    var el = document.getElementById('energyBalance');
+    if (!el) return;
+
+    var pv = data.pv_now_kw || 0;
+    var home = data.home_now_kw || 0;
+    var grid = data.grid_now_kw || 0;
+    var bat = data.battery_power_kw || 0;
+    var surplus = data.pv_surplus_kw || 0;
+
+    var gridColor = grid > 0 ? '#ff4444' : '#00ff88';
+    var gridLabel = grid > 0 ? 'Netzbezug' : 'Einspeisung';
+    var batColor = bat > 0 ? '#00ff88' : '#ffaa00';
+    var batLabel = bat > 0 ? 'Bat. l\u00E4dt' : (bat < 0 ? 'Bat. entl\u00E4dt' : 'Batterie');
+
+    var h = '';
+    h += '<div class="eb-item"><div class="eb-value" style="color:#ffdd00;">' + pv.toFixed(1) + ' kW</div><div class="eb-label">\u2600\uFE0F PV-Erzeugung</div></div>';
+    h += '<div class="eb-item"><div class="eb-value" style="color:#ffaa00;">' + home.toFixed(1) + ' kW</div><div class="eb-label">\u{1F3E0} Hausverbrauch</div></div>';
+    h += '<div class="eb-item"><div class="eb-value" style="color:' + gridColor + ';">' + Math.abs(grid).toFixed(1) + ' kW</div><div class="eb-label">\u{1F50C} ' + gridLabel + '</div></div>';
+    h += '<div class="eb-item"><div class="eb-value" style="color:' + batColor + ';">' + Math.abs(bat).toFixed(1) + ' kW</div><div class="eb-label">\u{1F50B} ' + batLabel + '</div></div>';
+    if (surplus > 0.1) {
+        h += '<div class="eb-item"><div class="eb-value" style="color:#00ff88;">' + surplus.toFixed(1) + ' kW</div><div class="eb-label">\u2728 PV-\u00DCberschuss</div></div>';
+    }
+    el.innerHTML = h;
+}
+
 // ---- Device cards ----
 function renderSlots(slots, vehicles) {
     var container = $('devicesContainer');
@@ -198,7 +226,11 @@ function renderDevice(dev, deviceId, vehicleInfo) {
     }
 
     if (need > 0 && slots.length > 0) {
-        h += '<div style="margin-top:10px;color:#888;font-size:0.9em;">Bedarf: <strong>' + need.toFixed(1) + ' kWh</strong> in <strong>' + (dev.hours_needed || 0) + ' Stunden</strong></div>';
+        var pvOff = dev.pv_offset_kwh || 0;
+        var grossNeed = dev.gross_need_kwh || need;
+        var needText = '<strong>' + need.toFixed(1) + ' kWh</strong> in <strong>' + (dev.hours_needed || 0) + ' Stunden</strong>';
+        if (pvOff > 0.5) needText += ' <span style="color:#ffdd00;">(Brutto: ' + grossNeed.toFixed(1) + ' kWh, PV spart ~' + pvOff.toFixed(0) + ' kWh)</span>';
+        h += '<div style="margin-top:10px;color:#888;font-size:0.9em;">Netz-Bedarf: ' + needText + '</div>';
         h += '<div class="slots-container">';
         for (var s = 0; s < slots.length; s++) {
             var sl = slots[s];

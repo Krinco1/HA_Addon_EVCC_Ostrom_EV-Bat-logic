@@ -217,6 +217,7 @@ class WebServer:
             "rl_maturity": maturity,
             "current": {
                 "battery_soc": state.battery_soc,
+                "battery_w": state.battery_power,
                 "ev_connected": state.ev_connected,
                 "ev_name": state.ev_name,
                 "ev_soc": state.ev_soc,
@@ -224,6 +225,7 @@ class WebServer:
                 "price_ct": round(state.current_price * 100, 1),
                 "pv_w": state.pv_power,
                 "home_w": state.home_power,
+                "grid_w": state.grid_power,
             } if state else None,
             "active_limits": {
                 "battery_ct": round(lp.battery_limit_eur * 100, 1) if lp and lp.battery_limit_eur else None,
@@ -378,12 +380,13 @@ class WebServer:
                 actions.append({"device": "ev", "action": "wait", "reason": "price_too_high"})
 
         # PV info
+        pv_surplus = max(0, s.pv_power - s.home_power)
         if s.pv_power > 500:
-            texts.append(f"☀️ PV-Erzeugung: {s.pv_power/1000:.1f} kW – Eigenverbrauch wird priorisiert")
+            texts.append(f"☀️ PV: {s.pv_power/1000:.1f} kW → {pv_surplus/1000:.1f} kW Überschuss (Haus: {s.home_power/1000:.1f} kW)")
         elif s.pv_power > 0:
-            texts.append(f"🌤️ Geringe PV-Leistung: {s.pv_power:.0f}W")
+            texts.append(f"🌤️ PV: {s.pv_power:.0f}W (Haus: {s.home_power/1000:.1f} kW – kein Überschuss)")
         else:
-            texts.append("🌙 Kein Solarertrag – Netzstrom-Optimierung aktiv")
+            texts.append(f"🌙 Kein Solar – Netzstrom-Optimierung (Haus: {s.home_power/1000:.1f} kW)")
 
         # RL info
         bat_mode_info = self.rl_devices.get_device_status("battery") if self.rl_devices else {}
@@ -420,13 +423,20 @@ class WebServer:
             except Exception:
                 continue
 
-        # PV data (from current state)
+        # PV and home data (from current state)
         s = self._last_state
         pv_now = s.pv_power / 1000 if s else 0  # kW
+        home_now = s.home_power / 1000 if s else 0
+        grid_now = s.grid_power / 1000 if s else 0
+        bat_power = s.battery_power / 1000 if s else 0
 
         return {
             "prices": prices,
             "pv_now_kw": round(pv_now, 2),
+            "home_now_kw": round(home_now, 2),
+            "grid_now_kw": round(grid_now, 2),
+            "battery_power_kw": round(bat_power, 2),
+            "pv_surplus_kw": round(max(0, pv_now - home_now), 2),
             "current_price_ct": round(s.current_price * 100, 1) if s else None,
             "battery_max_ct": self.cfg.battery_max_price_ct,
             "ev_max_ct": self.cfg.ev_max_price_ct,
@@ -445,7 +455,7 @@ class WebServer:
 </style></head><body><div class="c">
 <h1>📚 EVCC-Smartload v{VERSION} Dokumentation</h1>
 <a href="/docs/readme"><div class="card"><h2>📖 README</h2><p>Installation, Konfiguration, Features, API, FAQ</p></div></a>
-<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.0</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
+<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.1</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
 <a href="/docs/api"><div class="card"><h2>🔌 API Referenz</h2><p>Alle Endpunkte mit Beispielen</p></div></a>
 <p style="text-align:center;margin-top:30px;"><a href="/">← Dashboard</a></p>
 </div></body></html>"""
@@ -552,32 +562,63 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles) -> dict:
 
     bat_soc = last_state.battery_soc if last_state else 50
 
+    # --- PV surplus estimation ---
+    # Use current PV/home as base for simple daylight forecast
+    pv_now_kw = (last_state.pv_power / 1000) if last_state else 0
+    home_now_kw = (last_state.home_power / 1000) if last_state else 1.5
+    pv_surplus_kw = max(0, pv_now_kw - home_now_kw)
+
+    # Estimate PV hours (simple: sunrise~7, sunset~19 local, seasonal)
+    local_hour = now.astimezone().hour if now.tzinfo else now.hour
+    pv_hours_remaining = max(0, 19 - max(local_hour, 7))  # hours of sun left today
+    # Conservative: assume 60% of current PV sustained for remaining daylight
+    pv_energy_forecast_kwh = pv_surplus_kw * 0.6 * pv_hours_remaining if pv_now_kw > 0.5 else 0
+
     result = {
         "timestamp": now.isoformat(),
         "deadline": ev_deadline.strftime("%H:%M"),
         "hours_until_deadline": round((ev_deadline - now).total_seconds() / 3600, 1),
+        "energy_balance": {
+            "pv_now_kw": round(pv_now_kw, 2),
+            "home_now_kw": round(home_now_kw, 2),
+            "pv_surplus_kw": round(pv_surplus_kw, 2),
+            "pv_forecast_kwh": round(pv_energy_forecast_kwh, 1),
+            "pv_hours_remaining": pv_hours_remaining,
+        },
         "battery": _device_slots("Hausbatterie", cfg.battery_capacity_kwh, bat_soc,
                                  cfg.battery_max_soc, cfg.battery_charge_power_kw,
-                                 cfg.battery_max_price_ct, hourly, None, "🔋"),
+                                 cfg.battery_max_price_ct, hourly, None, "🔋",
+                                 pv_offset_kwh=min(pv_energy_forecast_kwh * 0.3, 5)),
         "vehicles": {},
     }
 
+    # Distribute remaining PV surplus to vehicles
+    pv_for_vehicles = max(0, pv_energy_forecast_kwh * 0.7)  # 70% for EVs if connected
+    n_charging_vehicles = sum(1 for v in vehicles.values()
+                              if v.get_effective_soc() < cfg.ev_target_soc)
+    pv_per_vehicle = pv_for_vehicles / max(1, n_charging_vehicles)
+
     for name, v in vehicles.items():
+        needs_charge = v.get_effective_soc() < cfg.ev_target_soc
         result["vehicles"][name] = _device_slots(
             name, v.capacity_kwh, v.get_effective_soc(), cfg.ev_target_soc,
             11, cfg.ev_max_price_ct, hourly, ev_deadline,
             "🔌" if v.connected_to_wallbox else "🚗",
             v.last_update.isoformat() if v.last_update else None,
+            pv_offset_kwh=pv_per_vehicle if needs_charge else 0,
         )
     return result
 
 
 def _device_slots(name, capacity, soc, target, power_kw, max_price_ct,
-                  hourly, deadline, icon, last_update=None) -> dict:
-    need = max(0, (target - soc) / 100 * capacity)
-    hours_needed = int(need / power_kw * 1.2) + 1 if need > 1 else 0
+                  hourly, deadline, icon, last_update=None, pv_offset_kwh=0) -> dict:
+    gross_need = max(0, (target - soc) / 100 * capacity)
+    net_need = max(0, gross_need - pv_offset_kwh)
+    hours_needed = int(net_need / power_kw * 1.2) + 1 if net_need > 1 else 0
     base = {"name": name, "icon": icon, "current_soc": soc, "target_soc": target,
-            "capacity_kwh": capacity, "need_kwh": round(need, 1),
+            "capacity_kwh": capacity, "need_kwh": round(net_need, 1),
+            "gross_need_kwh": round(gross_need, 1),
+            "pv_offset_kwh": round(pv_offset_kwh, 1),
             "hours_needed": hours_needed, "last_update": last_update}
 
     if hours_needed == 0:
@@ -594,7 +635,7 @@ def _device_slots(name, capacity, soc, target, power_kw, max_price_ct,
                 "total_cost_eur": 0, "avg_price_ct": 0}
 
     chosen = sorted(sorted(eligible, key=lambda x: x[1])[:hours_needed], key=lambda x: x[0])
-    kwh_per = min(need, hours_needed * power_kw) / len(chosen) if chosen else 0
+    kwh_per = min(net_need, hours_needed * power_kw) / len(chosen) if chosen else 0
     total_cost = sum(kwh_per * p for _, p in chosen)
     avg_price = sum(p for _, p in chosen) / len(chosen) * 100
 
@@ -609,7 +650,8 @@ def _device_slots(name, capacity, soc, target, power_kw, max_price_ct,
         "is_now": h.hour == now.hour and h.date() == now.date(),
     } for h, p in chosen]
 
-    status = f"✅ {len(chosen)} Stunden geplant" if len(chosen) >= hours_needed else f"⚠️ Nur {len(chosen)}/{hours_needed} Stunden"
+    pv_text = f" (inkl. ~{pv_offset_kwh:.0f}kWh PV)" if pv_offset_kwh > 0.5 else ""
+    status = f"✅ {len(chosen)} Stunden geplant{pv_text}" if len(chosen) >= hours_needed else f"⚠️ Nur {len(chosen)}/{hours_needed} Stunden"
     return {**base, "status": status, "slots": slots,
             "total_cost_eur": round(total_cost, 2), "avg_price_ct": round(avg_price, 1),
             "threshold_ct": round(max(p for _, p in chosen) * 100, 1)}

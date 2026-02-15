@@ -41,6 +41,12 @@
         .legend-mid::before { background: #ffaa00; }
         .legend-exp::before { background: #ff4444; }
 
+        /* Energy balance mini cards */
+        .eb-item { background: #0f3460; border-radius: 8px; padding: 12px; text-align: center; }
+        .eb-value { font-size: 1.3em; font-weight: bold; }
+        .eb-label { font-size: 0.75em; color: #888; margin-top: 2px; }
+        .eb-arrow { color: #888; font-size: 0.9em; }
+
         .device-card { background: #16213e; border-radius: 10px; padding: 18px; margin-bottom: 15px; }
         .device-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
         .device-name { font-size: 1.15em; font-weight: bold; }
@@ -125,6 +131,13 @@
             <span class="legend-cheap">Günstig (&lt;25ct)</span>
             <span class="legend-mid">Mittel (25–35ct)</span>
             <span class="legend-exp">Teuer (&gt;35ct)</span>
+        </div>
+    </div>
+
+    <!-- Energy balance -->
+    <div class="device-card" id="energyBalanceCard">
+        <h3 style="margin-bottom: 12px;">⚡ Energiebilanz</h3>
+        <div id="energyBalance" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
         </div>
     </div>
 

@@ -1,4 +1,4 @@
-# ⚡ EVCC-Smartload v4.3.0
+# ⚡ EVCC-Smartload v4.3.1
 
 **Intelligentes Energiemanagement für Home Assistant**
 
@@ -73,7 +73,7 @@ Optimiert Hausbatterie und Elektrofahrzeug-Ladung auf Basis dynamischer Strompre
 
 ### Fahrzeug-Provider
 
-Ab v4.3.0 werden Fahrzeuge über eine separate `vehicles.yaml` im Addon-Config-Verzeichnis konfiguriert.
+Ab v4.3.1 werden Fahrzeuge über eine separate `vehicles.yaml` im Addon-Config-Verzeichnis konfiguriert.
 Das Format ist **identisch zur evcc.yaml** — du kannst deine Fahrzeug-Einträge direkt kopieren.
 
 Beim ersten Start wird automatisch eine Beispiel-Datei angelegt.
@@ -151,7 +151,7 @@ Basis-URL: `http://homeassistant:8099`
 
 | Endpunkt | Beschreibung |
 |----------|--------------|
-| `/health` | Health-Check (`{"status": "ok", "version": "4.3.0"}`) |
+| `/health` | Health-Check (`{"status": "ok", "version": "4.3.1"}`) |
 | `/status` | Vollständiger System-Status inkl. RL-Metriken |
 | `/vehicles` | Alle Fahrzeuge mit SoC, Datenquelle, manuellem Override |
 | `/slots` | Detaillierte Ladeslots für alle Geräte |
@@ -170,7 +170,7 @@ Basis-URL: `http://homeassistant:8099`
 
 ---
 
-## 🏗️ Architektur (v4.3.0)
+## 🏗️ Architektur (v4.3.1)
 
 ```
 rootfs/app/
