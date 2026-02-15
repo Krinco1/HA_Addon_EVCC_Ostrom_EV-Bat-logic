@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+*.db
+*.json
+!repository.json
+!config.yaml
