@@ -1,6 +1,6 @@
 name: "EVCC-Smartload - Hybrid Optimizer"
 slug: evcc_smartload
-version: "4.3.2"
+version: "4.3.5"
 description: "Modulare Architektur · LP Optimizer + Shadow RL · Pro-Device Control · Manueller SoC · Live-Dashboard"
 url: "https://github.com/Krinco1/HA_Addon_EVCC-Smartload"
 arch:

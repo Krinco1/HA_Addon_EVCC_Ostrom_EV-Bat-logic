@@ -1,5 +1,5 @@
 """
-EVCC-Smartload v4.3.2 – Hybrid LP + Shadow RL Optimizer
+EVCC-Smartload v4.3.5 – Hybrid LP + Shadow RL Optimizer
 
 Entry point. Initialises all components and runs the main decision loop.
 """
@@ -54,12 +54,8 @@ def main():
             # Seed comparator so RL maturity reflects historical data
             comparator.seed_from_bootstrap(bootstrapped)
 
-    # --- Register all known devices for RL tracking ---
-    rl_devices.get_device_mode("battery")  # Always register battery
-    time.sleep(3)  # Wait for first vehicle poll
-    for vname in vehicle_monitor.get_all_vehicles():
-        rl_devices.get_device_mode(vname)
-        log("info", f"Registered RL device: {vname}")
+    # --- Register battery for RL tracking (vehicles registered after first poll) ---
+    rl_devices.get_device_mode("battery")
 
     # --- Start background services ---
     collector.start_background_collection()
@@ -73,6 +69,7 @@ def main():
     last_state: Optional[SystemState] = None
     last_rl_action: Optional[Action] = None
     learning_steps = 0
+    registered_rl_devices: set = {"battery"}
 
     log("info", "Starting main decision loop...")
 
@@ -84,11 +81,21 @@ def main():
                 time.sleep(60)
                 continue
 
+            # Dynamic RL device registration (catches vehicles that appear after startup)
+            for vname in vehicle_monitor.get_all_vehicles():
+                if vname not in registered_rl_devices:
+                    rl_devices.get_device_mode(vname)
+                    registered_rl_devices.add(vname)
+                    log("info", f"Registered RL device: {vname}")
+
             events = event_detector.detect(state)
             if events:
                 log("info", f"Events: {events}")
 
             tariffs = evcc.get_tariff_grid()
+            solar_forecast = evcc.get_tariff_solar()
+            if solar_forecast:
+                log("debug", f"Solar forecast: {len(solar_forecast)} entries")
 
             # LP decision (production)
             lp_action = optimizer.optimize(state, tariffs)
@@ -97,7 +104,7 @@ def main():
             rl_action = rl_agent.select_action(state, explore=True)
 
             # Update web server
-            web.update_state(state, lp_action, rl_action)
+            web.update_state(state, lp_action, rl_action, solar_forecast=solar_forecast)
 
             # Imitation learning
             rl_agent.imitation_learn(state, lp_action)
@@ -126,7 +133,9 @@ def main():
 
             # Comparison
             comparator.compare(state, lp_action, rl_action, actual_cost)
-            comparator.compare_per_device(state, lp_action, rl_action, actual_cost, rl_devices)
+            all_vehicles = vehicle_monitor.get_all_vehicles()
+            comparator.compare_per_device(state, lp_action, rl_action, actual_cost,
+                                          rl_devices, all_vehicles=all_vehicles)
 
             last_state = state
             last_rl_action = rl_action

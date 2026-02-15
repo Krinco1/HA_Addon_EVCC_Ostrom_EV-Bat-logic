@@ -1,5 +1,67 @@
 # Changelog
 
+## v4.3.5 (2026-02-15)
+
+### 🔧 RL: Alle Fahrzeuge tracken + Persistence Fix
+
+**KIA fehlt in RL-Tabelle (Root Cause):**
+- `compare_per_device()` trackte nur das Fahrzeug an der Wallbox (`state.ev_connected`)
+- KIA_EV9 war nie angeschlossen → wurde nie verglichen → 0 Comparisons → unsichtbar
+- Fix: Neue Methode `_eval_vehicle_charge_cost()` bewertet ALLE Fahrzeuge pro Loop-Iteration
+- Jedes Fahrzeug aus `vehicle_monitor.get_all_vehicles()` wird jetzt verglichen
+- Für nicht-angeschlossene EVs: theoretische Preisbewertung ("wäre jetzt gut zum Laden?")
+
+**Win-Rate/Vergleiche Reset (Root Cause):**
+- `device_comparisons` Dict war in-memory, wurde bei Neustart auf 0 zurückgesetzt
+- Erste Comparison nach Restart schrieb `comparisons=1` in SQLite (SET, nicht INCREMENT)
+- Fix (v4.3.4): Per-Device Stats werden in JSON persistiert und beim Start geladen
+- Beim nächsten Neustart lädt der Comparator die korrekten Zähler
+
+**Dynamische Registrierung (v4.3.4):**
+- Fahrzeuge werden im Main-Loop registriert, nicht beim Start (wo vehicles noch leer ist)
+- `time.sleep(3)` Hack entfernt, registriert automatisch sobald Vehicle-Daten verfügbar
+
+---
+
+## v4.3.4 (2026-02-15)
+
+### 🐛 RL Device Registration & Persistence Fix
+
+**KIA fehlt in RL-Tabelle:**
+- Ursache: Registrierung lief VOR `vehicle_monitor.start_polling()` → `get_all_vehicles()` war leer
+- Fix: Dynamische Registrierung im Main-Loop — jedes neue Fahrzeug wird automatisch registriert
+- KIA_EV9 erscheint jetzt in der RL-Tabelle sobald es erstmals gepollt wird
+
+**Win-Rate/Vergleiche resettet bei Neustart:**
+- Ursache: `device_comparisons` und `device_wins` waren nur in-memory (defaultdict), nicht persistiert
+- Nach jedem Neustart: Zähler bei 0 → erster Vergleich überschreibt SQLite mit `comparisons=1`
+- Fix: Per-Device Stats werden jetzt in `comparator.save()` mitgespeichert und beim Start geladen
+- Neue persistierte Felder: `device_comparisons`, `device_wins`, `device_costs_lp`, `device_costs_rl`
+
+---
+
+## v4.3.3 (2026-02-15)
+
+### ☀️ Echte Solar-Prognose & Chart-Overlay
+
+**Solar-Forecast von evcc:**
+- Neuer API-Aufruf: `/api/tariff/solar` liefert stündliche PV-Prognose
+- Wird automatisch genutzt wenn evcc Solar-Forecast konfiguriert hat
+- Fallback auf Schätzung (60% × aktuell × Stunden) wenn kein Forecast vorhanden
+
+**Chart: Solar-Overlay:**
+- Gelbe halbtransparente Fläche zeigt PV-Prognose je Stunde
+- Tooltip: "14:00: 28.5ct | ☀️ 4.2kW"
+- Zusammenfassung: "☀️ Aktuell: 2.4 kW PV | 📈 Prognose: 18 kWh heute"
+- Neue Legende: "☀️ Solar-Prognose"
+
+**Ladeplanung mit echtem Forecast:**
+- Slot-Berechnung nutzt echte PV-Prognose statt grober Schätzung
+- Überschuss = Solar - Hausverbrauch pro Stunde (realistischer)
+- `forecast_source: "evcc"` vs `"estimate"` in API sichtbar
+
+---
+
 ## v4.3.2 (2026-02-15)
 
 ### 🕐 Timestamp-Fix & 📱 Mobile-First Dashboard

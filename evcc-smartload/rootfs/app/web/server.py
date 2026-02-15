@@ -47,11 +47,15 @@ class WebServer:
         self._last_state: Optional[SystemState] = None
         self._last_lp_action: Optional[Action] = None
         self._last_rl_action: Optional[Action] = None
+        self._last_solar_forecast: List[Dict] = []
 
-    def update_state(self, state: SystemState, lp_action: Action, rl_action: Action):
+    def update_state(self, state: SystemState, lp_action: Action, rl_action: Action,
+                     solar_forecast: List[Dict] = None):
         self._last_state = state
         self._last_lp_action = lp_action
         self._last_rl_action = rl_action
+        if solar_forecast is not None:
+            self._last_solar_forecast = solar_forecast
 
     # ------------------------------------------------------------------
     # Start
@@ -92,7 +96,7 @@ class WebServer:
 
                 elif path == "/slots":
                     tariffs = srv.collector.evcc.get_tariff_grid()
-                    self._json(srv._api_slots(tariffs))
+                    self._json(srv._api_slots(tariffs, srv._last_solar_forecast))
 
                 elif path == "/vehicles":
                     self._json(srv._api_vehicles())
@@ -115,7 +119,7 @@ class WebServer:
 
                 elif path == "/chart-data":
                     tariffs = srv.collector.evcc.get_tariff_grid()
-                    self._json(srv._api_chart_data(tariffs))
+                    self._json(srv._api_chart_data(tariffs, srv._last_solar_forecast))
 
                 elif path == "/docs":
                     self._html(srv._docs_index())
@@ -275,12 +279,13 @@ class WebServer:
             "total_charge_needed_kwh": sum(needs.values()),
         }
 
-    def _api_slots(self, tariffs: List[Dict]) -> dict:
+    def _api_slots(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
         return _calculate_charge_slots(
             tariffs=tariffs,
             cfg=self.cfg,
             last_state=self._last_state,
             vehicles=self.vehicle_monitor.get_all_vehicles(),
+            solar_forecast=solar_forecast,
         )
 
     def _api_rl_devices(self) -> dict:
@@ -402,9 +407,11 @@ class WebServer:
 
         return {"text": " · ".join(texts[:2]), "details": texts, "actions": actions}
 
-    def _api_chart_data(self, tariffs: List[Dict]) -> dict:
+    def _api_chart_data(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
         from datetime import timedelta
         now = datetime.now(timezone.utc)
+
+        # Parse grid prices
         prices = []
         for t in tariffs:
             try:
@@ -427,6 +434,33 @@ class WebServer:
             except Exception:
                 continue
 
+        # Parse solar forecast into hourly kW values
+        solar_by_hour = {}
+        if solar_forecast:
+            for t in solar_forecast:
+                try:
+                    s = t.get("start", "")
+                    val = float(t.get("value", 0))  # kW (evcc solar tariff = kW forecast)
+                    if s.endswith("Z"):
+                        start = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                    elif "+" in s:
+                        start = datetime.fromisoformat(s)
+                    else:
+                        start = datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+                    hour = start.replace(minute=0, second=0, microsecond=0)
+                    hour_key = hour.astimezone().strftime("%H:%M")
+                    # Aggregate if multiple entries per hour
+                    if hour_key in solar_by_hour:
+                        solar_by_hour[hour_key] = max(solar_by_hour[hour_key], val)
+                    else:
+                        solar_by_hour[hour_key] = val
+                except Exception:
+                    continue
+
+        # Merge solar into prices
+        for p in prices:
+            p["solar_kw"] = round(solar_by_hour.get(p["hour"], 0), 2)
+
         # PV and home data (from current state)
         s = self._last_state
         pv_now = s.pv_power / 1000 if s else 0  # kW
@@ -434,8 +468,13 @@ class WebServer:
         grid_now = s.grid_power / 1000 if s else 0
         bat_power = s.battery_power / 1000 if s else 0
 
+        # Total solar forecast energy
+        total_solar_kwh = sum(solar_by_hour.values())  # kW per hour ≈ kWh
+
         return {
             "prices": prices,
+            "has_solar_forecast": len(solar_by_hour) > 0,
+            "solar_total_kwh": round(total_solar_kwh, 1),
             "pv_now_kw": round(pv_now, 2),
             "home_now_kw": round(home_now, 2),
             "grid_now_kw": round(grid_now, 2),
@@ -459,7 +498,7 @@ class WebServer:
 </style></head><body><div class="c">
 <h1>📚 EVCC-Smartload v{VERSION} Dokumentation</h1>
 <a href="/docs/readme"><div class="card"><h2>📖 README</h2><p>Installation, Konfiguration, Features, API, FAQ</p></div></a>
-<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.2</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
+<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.5</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
 <a href="/docs/api"><div class="card"><h2>🔌 API Referenz</h2><p>Alle Endpunkte mit Beispielen</p></div></a>
 <p style="text-align:center;margin-top:30px;"><a href="/">← Dashboard</a></p>
 </div></body></html>"""
@@ -534,7 +573,7 @@ pre{{background:#0f3460;padding:15px;border-radius:6px;}}code{{color:#00ff88;}}
 # Charge-slot calculation (stateless helper)
 # =============================================================================
 
-def _calculate_charge_slots(tariffs, cfg, last_state, vehicles) -> dict:
+def _calculate_charge_slots(tariffs, cfg, last_state, vehicles, solar_forecast=None) -> dict:
     now = datetime.now(timezone.utc)
 
     # Parse tariffs
@@ -566,17 +605,42 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles) -> dict:
 
     bat_soc = last_state.battery_soc if last_state else 50
 
-    # --- PV surplus estimation ---
-    # Use current PV/home as base for simple daylight forecast
+    # --- PV forecast (prefer real evcc solar forecast, fallback to estimate) ---
     pv_now_kw = (last_state.pv_power / 1000) if last_state else 0
     home_now_kw = (last_state.home_power / 1000) if last_state else 1.5
-    pv_surplus_kw = max(0, pv_now_kw - home_now_kw)
 
-    # Estimate PV hours (simple: sunrise~7, sunset~19 local, seasonal)
-    local_hour = now.astimezone().hour if now.tzinfo else now.hour
-    pv_hours_remaining = max(0, 19 - max(local_hour, 7))  # hours of sun left today
-    # Conservative: assume 60% of current PV sustained for remaining daylight
-    pv_energy_forecast_kwh = pv_surplus_kw * 0.6 * pv_hours_remaining if pv_now_kw > 0.5 else 0
+    # Parse real solar forecast from evcc
+    solar_hourly_kw = {}
+    if solar_forecast:
+        for t in solar_forecast:
+            try:
+                s = t.get("start", "")
+                val = float(t.get("value", 0))
+                if s.endswith("Z"):
+                    start = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                elif "+" in s:
+                    start = datetime.fromisoformat(s)
+                else:
+                    start = datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+                hour = start.replace(minute=0, second=0, microsecond=0)
+                if hour >= now:
+                    solar_hourly_kw[hour] = max(solar_hourly_kw.get(hour, 0), val)
+            except Exception:
+                continue
+
+    if solar_hourly_kw:
+        # Real forecast: sum surplus (solar - home estimate) for remaining hours
+        pv_energy_forecast_kwh = sum(max(0, kw - home_now_kw) for kw in solar_hourly_kw.values())
+        forecast_source = "evcc"
+    else:
+        # Fallback: crude estimate from current PV
+        pv_surplus_kw = max(0, pv_now_kw - home_now_kw)
+        local_hour = now.astimezone().hour if now.tzinfo else now.hour
+        pv_hours_remaining = max(0, 19 - max(local_hour, 7))
+        pv_energy_forecast_kwh = pv_surplus_kw * 0.6 * pv_hours_remaining if pv_now_kw > 0.5 else 0
+        forecast_source = "estimate"
+
+    pv_surplus_now_kw = max(0, pv_now_kw - home_now_kw)
 
     result = {
         "timestamp": now.isoformat(),
@@ -585,9 +649,10 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles) -> dict:
         "energy_balance": {
             "pv_now_kw": round(pv_now_kw, 2),
             "home_now_kw": round(home_now_kw, 2),
-            "pv_surplus_kw": round(pv_surplus_kw, 2),
+            "pv_surplus_kw": round(pv_surplus_now_kw, 2),
             "pv_forecast_kwh": round(pv_energy_forecast_kwh, 1),
-            "pv_hours_remaining": pv_hours_remaining,
+            "forecast_source": forecast_source,
+            "solar_hours": len(solar_hourly_kw),
         },
         "battery": _device_slots("Hausbatterie", cfg.battery_capacity_kwh, bat_soc,
                                  cfg.battery_max_soc, cfg.battery_charge_power_kw,

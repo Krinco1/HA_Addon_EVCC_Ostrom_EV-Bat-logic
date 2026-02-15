@@ -1,5 +1,5 @@
 /**
- * EVCC-Smartload Dashboard v4.3.2
+ * EVCC-Smartload Dashboard v4.3.5
  *
  * Fetches /status, /slots, /vehicles, /strategy, /chart-data, /rl-devices
  * Auto-refreshes every 60 seconds.
@@ -95,13 +95,26 @@ function renderChart(data) {
     var evLimit = data.ev_max_ct || 40;
 
     var html = '';
+    // Check if we have solar data
+    var hasSolar = data.has_solar_forecast || false;
+    var maxSolar = hasSolar ? Math.max.apply(null, prices.map(function(p){ return p.solar_kw || 0; }).concat([1])) : 0;
+
     for (var i = 0; i < prices.length; i++) {
         var p = prices[i];
         var h = Math.max(2, (p.price_ct / maxPrice) * 120);
         var col = priceColor(p.price_ct);
         var cls = p.is_now ? ' now' : '';
-        html += '<div class="chart-bar' + cls + '" style="height:' + h + 'px;background:' + col + ';" title="' + p.hour + ': ' + p.price_ct.toFixed(1) + 'ct">';
+        var solarKw = p.solar_kw || 0;
+        var solarH = hasSolar ? Math.max(0, (solarKw / maxSolar) * 120) : 0;
+        var title = p.hour + ': ' + p.price_ct.toFixed(1) + 'ct';
+        if (solarKw > 0) title += ' | ☀️ ' + solarKw.toFixed(1) + 'kW';
+
+        html += '<div class="chart-bar' + cls + '" style="height:' + h + 'px;background:' + col + ';" title="' + title + '">';
         html += '<span class="bar-value" style="color:' + col + ';">' + p.price_ct.toFixed(1) + '</span>';
+        // Solar overlay dot/marker
+        if (solarKw > 0.1) {
+            html += '<div style="position:absolute;bottom:0;left:0;right:0;height:' + solarH + 'px;background:rgba(255,221,0,0.25);border-top:2px solid #ffdd00;border-radius:0;pointer-events:none;"></div>';
+        }
         html += '<span class="bar-label">' + p.hour + '</span>';
         html += '</div>';
     }
@@ -109,7 +122,7 @@ function renderChart(data) {
 
     // Limit lines
     var wrap = $('chartWrap');
-    var existing = wrap.querySelectorAll('.chart-limit,.pv-indicator');
+    var existing = wrap.querySelectorAll('.chart-limit,.pv-indicator,.solar-summary');
     for (var j = 0; j < existing.length; j++) existing[j].remove();
 
     function addLimit(val, label, color) {
@@ -125,14 +138,20 @@ function renderChart(data) {
     addLimit(batLimit, '\u{1F50B} ' + batLimit + 'ct', '#00d4ff');
     if (evLimit !== batLimit) addLimit(evLimit, '\u{1F50C} ' + evLimit + 'ct', '#ff88ff');
 
-    // PV indicator
+    // Solar summary line
     var pvKw = data.pv_now_kw || 0;
-    if (pvKw > 0) {
-        var pvEl = document.createElement('div');
-        pvEl.className = 'pv-indicator';
-        pvEl.style.cssText = 'text-align:right;font-size:0.85em;color:#ffdd00;margin-top:4px;';
-        pvEl.textContent = '\u2600\uFE0F Aktuell: ' + pvKw.toFixed(1) + ' kW PV';
-        wrap.appendChild(pvEl);
+    var summaryEl = document.createElement('div');
+    summaryEl.className = 'solar-summary';
+    summaryEl.style.cssText = 'display:flex;justify-content:space-between;font-size:0.85em;margin-top:4px;flex-wrap:wrap;gap:8px;';
+    var summaryHtml = '';
+    if (pvKw > 0) summaryHtml += '<span style="color:#ffdd00;">\u2600\uFE0F Aktuell: ' + pvKw.toFixed(1) + ' kW PV</span>';
+    if (hasSolar) {
+        var totalKwh = data.solar_total_kwh || 0;
+        summaryHtml += '<span style="color:#ffdd00;">\u{1F4C8} Prognose: ' + totalKwh.toFixed(0) + ' kWh heute</span>';
+    }
+    if (summaryHtml) {
+        summaryEl.innerHTML = summaryHtml;
+        wrap.appendChild(summaryEl);
     }
 }
 

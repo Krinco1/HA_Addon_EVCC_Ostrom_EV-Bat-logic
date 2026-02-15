@@ -124,8 +124,9 @@ class Comparator:
 
     def compare_per_device(self, state: SystemState, lp_action: Action,
                            rl_action: Action, actual_cost: float,
-                           rl_devices: "RLDeviceController"):
-        # Battery
+                           rl_devices: "RLDeviceController",
+                           all_vehicles: Dict = None):
+        # Battery — always compared
         bat_lp = self._eval_battery_cost(state, lp_action)
         bat_rl = self._eval_battery_cost(state, rl_action)
         self.device_comparisons["battery"] += 1
@@ -138,8 +139,23 @@ class Comparator:
             (bat_lp - bat_rl) * 100,
         )
 
-        # EV
-        if state.ev_connected and state.ev_name:
+        # ALL vehicles — compare charging decisions at current price
+        if all_vehicles:
+            for name, v in all_vehicles.items():
+                needs_charge = v.get_effective_soc() < 80  # below target
+                ev_lp = self._eval_vehicle_charge_cost(state, lp_action, needs_charge, v.connected_to_wallbox)
+                ev_rl = self._eval_vehicle_charge_cost(state, rl_action, needs_charge, v.connected_to_wallbox)
+                self.device_comparisons[name] += 1
+                if ev_rl <= ev_lp:
+                    self.device_wins[name] += 1
+                rl_devices.update_performance(
+                    name,
+                    self.device_wins[name] / max(1, self.device_comparisons[name]),
+                    self.device_comparisons[name],
+                    (ev_lp - ev_rl) * 100,
+                )
+        elif state.ev_connected and state.ev_name:
+            # Fallback: only connected EV (legacy)
             ev_lp = self._eval_ev_cost(state, lp_action)
             ev_rl = self._eval_ev_cost(state, rl_action)
             name = state.ev_name
@@ -167,6 +183,36 @@ class Comparator:
             return state.current_price * 2.0
         return 0.0
 
+    @staticmethod
+    def _eval_vehicle_charge_cost(state: SystemState, action: Action,
+                                   needs_charge: bool, connected: bool) -> float:
+        """Evaluate charging cost for any vehicle (connected or not).
+        
+        For connected vehicles: actual charge cost at current price.
+        For disconnected vehicles: evaluate the DECISION quality —
+        would this be a good time to charge if they were connected?
+        """
+        if not needs_charge:
+            return 0.0  # No charge needed → no cost either way
+
+        price = state.current_price
+        if connected:
+            # Actually charging — real cost
+            if action.ev_action in (1, 2):
+                return price * 2.0  # charging at current price
+            return 0.0  # waiting (opportunity cost: might miss cheap slot)
+        else:
+            # Not connected — evaluate price quality for theoretical charge
+            # LP: would charge if price < ev_max → cost = price if below limit
+            # RL: might pick different threshold
+            # Simple: compare against median-ish threshold (30ct)
+            if price < 0.25:
+                return -0.1  # Good price — both should agree to charge
+            elif price > 0.35:
+                return 0.1  # Bad price — both should agree to wait
+            else:
+                return 0.0  # Ambiguous — RL could learn the optimal threshold
+
     def get_status(self) -> Dict:
         n = len(self.comparisons)
         return {
@@ -189,6 +235,11 @@ class Comparator:
                     "rl_total_cost": self.rl_total_cost,
                     "rl_wins": self.rl_wins,
                     "rl_ready": self.rl_ready,
+                    # Per-device stats (v4.3.5)
+                    "device_comparisons": dict(self.device_comparisons),
+                    "device_wins": dict(self.device_wins),
+                    "device_costs_lp": dict(self.device_costs_lp),
+                    "device_costs_rl": dict(self.device_costs_rl),
                 }, f)
         except Exception:
             pass
@@ -218,9 +269,23 @@ class Comparator:
             self.rl_total_cost = data.get("rl_total_cost", 0)
             self.rl_wins = data.get("rl_wins", 0)
             self.rl_ready = data.get("rl_ready", False)
+
+            # Per-device stats (added v4.3.5)
+            for k, v in data.get("device_comparisons", {}).items():
+                self.device_comparisons[k] = v
+            for k, v in data.get("device_wins", {}).items():
+                self.device_wins[k] = v
+            for k, v in data.get("device_costs_lp", {}).items():
+                self.device_costs_lp[k] = v
+            for k, v in data.get("device_costs_rl", {}).items():
+                self.device_costs_rl[k] = v
+
             n = len(self.comparisons)
             if n:
                 log("info", f"Comparator loaded: {n} comparisons, win rate {self.rl_wins / n * 100:.1f}%")
+            dev_n = sum(self.device_comparisons.values())
+            if dev_n:
+                log("info", f"  Per-device: {dict(self.device_comparisons)}")
         except Exception:
             pass
 

@@ -55,11 +55,19 @@ class EvccClient:
 
     def get_tariff_grid(self) -> List[Dict]:
         """Fetch grid tariff rates from evcc."""
+        return self._get_tariff("grid")
+
+    def get_tariff_solar(self) -> List[Dict]:
+        """Fetch solar/PV forecast from evcc (kWh per slot)."""
+        return self._get_tariff("solar")
+
+    def _get_tariff(self, kind: str) -> List[Dict]:
+        """Fetch tariff data from evcc. kind = 'grid' or 'solar'."""
         self._login()
         try:
-            r = self.sess.get(f"{self.base_url}/api/tariff/grid", timeout=15)
+            r = self.sess.get(f"{self.base_url}/api/tariff/{kind}", timeout=15)
             if r.status_code != 200:
-                log("warning", f"Tariff API returned {r.status_code}")
+                log("warning", f"Tariff {kind} API returned {r.status_code}")
                 return []
 
             data = r.json()
@@ -80,7 +88,7 @@ class EvccClient:
             else:
                 rates = []
 
-            log("debug", f"Found {len(rates)} tariff rates")
+            log("debug", f"Found {len(rates)} {kind} tariff rates")
             return rates
         except Exception as e:
             log("error", f"Failed to get tariffs: {e}")

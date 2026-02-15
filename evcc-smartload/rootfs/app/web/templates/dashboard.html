@@ -40,6 +40,7 @@
         .legend-cheap::before { background: #00ff88; }
         .legend-mid::before { background: #ffaa00; }
         .legend-exp::before { background: #ff4444; }
+        .legend-solar::before { background: rgba(255,221,0,0.4); border: 1px solid #ffdd00; }
 
         /* Energy balance mini cards */
         .eb-item { background: #0f3460; border-radius: 8px; padding: 12px; text-align: center; }
@@ -181,7 +182,7 @@
 
     <!-- Price + PV chart -->
     <div class="chart-card">
-        <div class="chart-title">📊 Strompreis & Solarertrag</div>
+        <div class="chart-title">📊 Strompreis & Solar-Prognose</div>
         <div class="chart-wrap" id="chartWrap">
             <div class="chart-bars" id="chartBars"></div>
         </div>
@@ -189,6 +190,7 @@
             <span class="legend-cheap">Günstig (&lt;25ct)</span>
             <span class="legend-mid">Mittel (25–35ct)</span>
             <span class="legend-exp">Teuer (&gt;35ct)</span>
+            <span class="legend-solar">☀️ Solar-Prognose</span>
         </div>
     </div>
 
