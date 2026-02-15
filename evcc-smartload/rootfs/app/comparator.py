@@ -235,7 +235,7 @@ class Comparator:
                     "rl_total_cost": self.rl_total_cost,
                     "rl_wins": self.rl_wins,
                     "rl_ready": self.rl_ready,
-                    # Per-device stats (v4.3.6)
+                    # Per-device stats (v4.3.7)
                     "device_comparisons": dict(self.device_comparisons),
                     "device_wins": dict(self.device_wins),
                     "device_costs_lp": dict(self.device_costs_lp),
@@ -270,7 +270,7 @@ class Comparator:
             self.rl_wins = data.get("rl_wins", 0)
             self.rl_ready = data.get("rl_ready", False)
 
-            # Per-device stats (added v4.3.6)
+            # Per-device stats (added v4.3.7)
             for k, v in data.get("device_comparisons", {}).items():
                 self.device_comparisons[k] = v
             for k, v in data.get("device_wins", {}).items():

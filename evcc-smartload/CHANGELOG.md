@@ -1,5 +1,41 @@
 # Changelog
 
+## v4.3.7 (2026-02-15)
+
+### 🎯 Dynamische Entladegrenze (bufferSoc/prioritySoc via evcc API)
+
+**Dynamische Batterie-Entladegrenze:**
+- Berechnet automatisch wie tief die Batterie fürs EV entladen werden darf
+- Basiert auf Solar-Prognose, günstigen Strompreisen und EV-Bedarf
+- Setzt `bufferSoc`, `bufferStartSoc` und `prioritySoc` via evcc API
+- Beispiel: Viel Sonne erwartet → Batterie darf tief entladen (Solar füllt auf)
+- Beispiel: Bewölkt + teure Preise → Batterie wird geschont
+
+**Algorithmus:**
+1. Solar-Refill: PV-Prognose minus Hausverbrauch → erwartete Aufladung in %
+2. Netz-Refill: Günstige Stunden × Ladeleistung × Effizienz → erwartete Aufladung in %
+3. Gesamt-Refill = Solar + Netz (max 80%, mit 80% Sicherheitsfaktor)
+4. Entladegrenze = max(Untergrenze, Aktuell - Sicherheits-Entladung, Aktuell - EV-Bedarf)
+5. `bufferSoc` = Entladegrenze (darüber: Batterie→EV erlaubt)
+6. `prioritySoc` = Untergrenze - 5% (darunter: Batterie hat absoluten Vorrang)
+
+**Dashboard-Visualisierung:**
+- Batterie-Balken mit farbigen Zonen: Rot (Schutz), Gelb (Puffer), Grün (für EV)
+- Aufschlüsselung: Solar-Refill, Günstig-Netz, EV-Bedarf, Untergrenze
+- Aktualisiert sich alle 15 Minuten
+
+**Neue evcc API-Methoden:**
+- `set_buffer_soc(soc)` → bufferSoc setzen
+- `set_buffer_start_soc(soc)` → bufferStartSoc setzen
+- `set_priority_soc(soc)` → prioritySoc setzen
+- `set_battery_boost(lp_id, enabled)` → Battery-Boost an/aus
+
+**Neue Konfigurationsparameter:**
+- `battery_to_ev_dynamic_limit`: true (dynamisch an/aus)
+- `battery_to_ev_floor_soc`: 20 (absolute Untergrenze in %)
+
+---
+
 ## v4.3.6 (2026-02-15)
 
 ### 🔋→🚗 Batterie-Entladung für EV + Solar-Linie + KIA-RL-Fix

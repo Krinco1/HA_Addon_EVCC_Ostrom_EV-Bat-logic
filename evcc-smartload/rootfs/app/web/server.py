@@ -309,6 +309,8 @@ class WebServer:
             "battery_charge_eff": self.cfg.battery_charge_efficiency,
             "battery_discharge_eff": self.cfg.battery_discharge_efficiency,
             "bat_to_ev_min_ct": self.cfg.battery_to_ev_min_profit_ct,
+            "bat_to_ev_dynamic": self.cfg.battery_to_ev_dynamic_limit,
+            "bat_to_ev_floor": self.cfg.battery_to_ev_floor_soc,
         }
 
     def _api_summary(self) -> dict:
@@ -501,7 +503,7 @@ class WebServer:
 </style></head><body><div class="c">
 <h1>📚 EVCC-Smartload v{VERSION} Dokumentation</h1>
 <a href="/docs/readme"><div class="card"><h2>📖 README</h2><p>Installation, Konfiguration, Features, API, FAQ</p></div></a>
-<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.6</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
+<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.7</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
 <a href="/docs/api"><div class="card"><h2>🔌 API Referenz</h2><p>Alle Endpunkte mit Beispielen</p></div></a>
 <p style="text-align:center;margin-top:30px;"><a href="/">← Dashboard</a></p>
 </div></body></html>"""
@@ -729,6 +731,7 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles, solar_forecast=N
         "round_trip_efficiency": round(round_trip_eff * 100, 1),
         "is_profitable": is_profitable,
         "min_profit_ct": cfg.battery_to_ev_min_profit_ct,
+        "dynamic_limit_enabled": cfg.battery_to_ev_dynamic_limit,
         "recommendation": (
             f"🔋→🚗 Batterie-Entladung lohnt sich! Spare ~{savings_vs_grid_ct:.0f}ct/kWh "
             f"({bat_for_ev_kwh:.0f} kWh verfügbar)"
@@ -738,6 +741,46 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles, solar_forecast=N
             "✅ Kein EV-Ladebedarf"
         ),
     }
+
+    # Dynamic discharge limits (for dashboard display)
+    if cfg.battery_to_ev_dynamic_limit and total_ev_need > 0.5:
+        bat_cap = cfg.battery_capacity_kwh
+        floor = cfg.battery_to_ev_floor_soc
+        home_kw = (last_state.home_power / 1000) if last_state and last_state.home_power else 1.0
+
+        # Solar surplus estimate
+        solar_surplus_kwh = 0
+        if solar_forecast:
+            for slot in solar_forecast:
+                kw = slot.get("value", 0)
+                solar_surplus_kwh += max(0, kw - home_kw)
+        solar_refill_pct = min(90, (solar_surplus_kwh / bat_cap) * 100) if bat_cap > 0 else 0
+
+        # Cheap grid hours
+        cheap_hours = sum(1 for _, p in hourly if p * 100 <= cfg.battery_max_price_ct)
+        grid_refill_kwh = cheap_hours * cfg.battery_charge_power_kw * cfg.battery_charge_efficiency
+        grid_refill_pct = min(90, (grid_refill_kwh / bat_cap) * 100) if bat_cap > 0 else 0
+
+        total_refill_pct = min(80, solar_refill_pct + grid_refill_pct)
+        safe_discharge = total_refill_pct * 0.8
+        dynamic_floor = max(floor, int(bat_soc - safe_discharge))
+
+        ev_need_pct = (total_ev_need / (bat_cap * round_trip_eff)) * 100 if bat_cap > 0 else 0
+        buffer_soc = max(floor, int(bat_soc - ev_need_pct), dynamic_floor)
+        priority_soc = max(cfg.battery_min_soc, floor - 5)
+
+        result["battery_to_ev"]["dynamic_limits"] = {
+            "buffer_soc": buffer_soc,
+            "priority_soc": priority_soc,
+            "buffer_start_soc": min(90, buffer_soc + 10),
+            "floor_soc": floor,
+            "solar_refill_pct": round(solar_refill_pct, 1),
+            "grid_refill_pct": round(grid_refill_pct, 1),
+            "total_refill_pct": round(total_refill_pct, 1),
+            "ev_need_pct": round(ev_need_pct, 1),
+            "cheap_hours": cheap_hours,
+            "solar_surplus_kwh": round(solar_surplus_kwh, 1),
+        }
 
     return result
 

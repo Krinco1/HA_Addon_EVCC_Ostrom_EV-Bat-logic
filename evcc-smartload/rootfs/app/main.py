@@ -1,5 +1,5 @@
 """
-EVCC-Smartload v4.3.6 – Hybrid LP + Shadow RL Optimizer
+EVCC-Smartload v4.3.7 – Hybrid LP + Shadow RL Optimizer
 
 Entry point. Initialises all components and runs the main decision loop.
 """
@@ -144,10 +144,29 @@ def main():
                     bat_cost_ct = cfg.battery_max_price_ct / rt_eff
                     grid_ct = state.current_price * 100
                     savings = grid_ct - bat_cost_ct
+
+                    # Solar surplus estimate for refill calculation
+                    solar_surplus_kwh = 0
+                    if solar_forecast:
+                        home_kw = state.home_power / 1000 if state.home_power else 1.0
+                        for slot in solar_forecast:
+                            kw = slot.get("value", 0)
+                            solar_surplus_kwh += max(0, kw - home_kw)
+
+                    # Count cheap hours remaining
+                    cheap_hours = sum(
+                        1 for t in tariffs
+                        if t.get("value", 1) * 100 <= cfg.battery_max_price_ct
+                    )
+
                     bat_to_ev_info = {
                         "is_profitable": savings >= cfg.battery_to_ev_min_profit_ct,
                         "usable_kwh": min(bat_available, total_ev_need),
                         "savings_ct_per_kwh": savings,
+                        "bat_soc": state.battery_soc,
+                        "ev_need_kwh": total_ev_need,
+                        "solar_surplus_kwh": solar_surplus_kwh,
+                        "cheap_hours": cheap_hours,
                     }
                     controller.apply_battery_to_ev(bat_to_ev_info, any_ev_connected)
                 else:

@@ -210,3 +210,64 @@ class EvccClient:
             return r.status_code == 200
         except Exception:
             return False
+
+    # ------------------------------------------------------------------
+    # Battery buffer / priority SoC (dynamic discharge limits)
+    # ------------------------------------------------------------------
+
+    def set_buffer_soc(self, soc: int) -> bool:
+        """Set bufferSoc: above this SoC, battery may power the EV (PV mode)."""
+        self._login()
+        try:
+            r = self.sess.post(f"{self.base_url}/api/buffersoc/{soc}", timeout=10)
+            if r.status_code == 200:
+                log("info", f"✓ bufferSoc set to {soc}%")
+                return True
+            log("warning", f"✗ Failed to set bufferSoc: {r.status_code}")
+            return False
+        except Exception as e:
+            log("error", f"✗ bufferSoc error: {e}")
+            return False
+
+    def set_buffer_start_soc(self, soc: int) -> bool:
+        """Set bufferStartSoc: above this SoC, EV charging may start without PV surplus."""
+        self._login()
+        try:
+            r = self.sess.post(f"{self.base_url}/api/bufferstartsoc/{soc}", timeout=10)
+            if r.status_code == 200:
+                log("info", f"✓ bufferStartSoc set to {soc}%")
+                return True
+            log("warning", f"✗ Failed to set bufferStartSoc: {r.status_code}")
+            return False
+        except Exception as e:
+            log("error", f"✗ bufferStartSoc error: {e}")
+            return False
+
+    def set_priority_soc(self, soc: int) -> bool:
+        """Set prioritySoc: below this SoC, battery has priority over EV charging."""
+        self._login()
+        try:
+            r = self.sess.post(f"{self.base_url}/api/prioritysoc/{soc}", timeout=10)
+            if r.status_code == 200:
+                log("info", f"✓ prioritySoc set to {soc}%")
+                return True
+            log("warning", f"✗ Failed to set prioritySoc: {r.status_code}")
+            return False
+        except Exception as e:
+            log("error", f"✗ prioritySoc error: {e}")
+            return False
+
+    def set_battery_boost(self, lp_id: int, enabled: bool) -> bool:
+        """Enable/disable battery boost on loadpoint (charge with PV + max battery)."""
+        self._login()
+        try:
+            val = "true" if enabled else "false"
+            r = self.sess.post(f"{self.base_url}/api/loadpoints/{lp_id}/batteryboost/{val}", timeout=10)
+            if r.status_code == 200:
+                log("info", f"✓ Battery boost LP{lp_id}: {val}")
+                return True
+            log("warning", f"✗ Battery boost failed: {r.status_code}")
+            return False
+        except Exception as e:
+            log("error", f"✗ Battery boost error: {e}")
+            return False

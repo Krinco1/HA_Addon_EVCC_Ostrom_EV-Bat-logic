@@ -1,5 +1,5 @@
 /**
- * EVCC-Smartload Dashboard v4.3.6
+ * EVCC-Smartload Dashboard v4.3.7
  *
  * Fetches /status, /slots, /vehicles, /strategy, /chart-data, /rl-devices
  * Auto-refreshes every 60 seconds.
@@ -303,11 +303,49 @@ function renderBatToEv(b2e) {
         var savingsTotal = (b2e.savings_ct_per_kwh * b2e.usable_kwh).toFixed(0);
         h += '<div style="margin-top:10px;padding:8px;background:#0a2a0a;border:1px solid #00ff88;border-radius:6px;text-align:center;">';
         h += '<span style="color:#00ff88;font-weight:bold;">\u2714 Ersparnis: ~' + savingsTotal + ' ct</span>';
-        h += ' <span style="color:#888;font-size:0.85em;">(' + b2e.savings_ct_per_kwh + ' ct/kWh × ' + b2e.usable_kwh + ' kWh)</span>';
+        h += ' <span style="color:#888;font-size:0.85em;">(' + b2e.savings_ct_per_kwh + ' ct/kWh \u00D7 ' + b2e.usable_kwh + ' kWh)</span>';
         h += '</div>';
     } else {
         h += '<div style="margin-top:10px;padding:8px;background:#1a1a2e;border:1px solid #555;border-radius:6px;text-align:center;color:#888;font-size:0.9em;">';
-        h += 'Mindest-Ersparnis: ' + b2e.min_profit_ct + ' ct/kWh nötig';
+        h += 'Mindest-Ersparnis: ' + b2e.min_profit_ct + ' ct/kWh n\u00F6tig';
+        h += '</div>';
+    }
+
+    // Dynamic discharge limits
+    var dl = b2e.dynamic_limits;
+    if (dl && b2e.dynamic_limit_enabled) {
+        h += '<div style="margin-top:12px;padding:10px;background:#0f3460;border-radius:6px;">';
+        h += '<div style="font-size:0.9em;font-weight:bold;margin-bottom:8px;color:#00d4ff;">\u{1F3AF} Dynamische Entladegrenze</div>';
+
+        // Visual battery bar with zones
+        h += '<div style="position:relative;height:28px;background:#1a1a2e;border-radius:14px;overflow:hidden;margin-bottom:8px;border:1px solid #333;">';
+        // Priority zone (red) - 0 to prioritySoc
+        h += '<div style="position:absolute;left:0;width:' + dl.priority_soc + '%;height:100%;background:rgba(255,68,68,0.3);"></div>';
+        // Buffer zone (yellow) - prioritySoc to bufferSoc
+        var bufferWidth = Math.max(0, dl.buffer_soc - dl.priority_soc);
+        h += '<div style="position:absolute;left:' + dl.priority_soc + '%;width:' + bufferWidth + '%;height:100%;background:rgba(255,170,0,0.2);"></div>';
+        // Available for EV zone (green) - bufferSoc to 100
+        var evWidth = 100 - dl.buffer_soc;
+        h += '<div style="position:absolute;left:' + dl.buffer_soc + '%;width:' + evWidth + '%;height:100%;background:rgba(0,255,136,0.15);"></div>';
+        // Labels
+        h += '<div style="position:absolute;left:' + (dl.priority_soc - 1) + '%;top:0;bottom:0;border-right:2px solid #ff4444;"></div>';
+        h += '<div style="position:absolute;left:' + (dl.buffer_soc - 1) + '%;top:0;bottom:0;border-right:2px solid #00ff88;"></div>';
+        h += '<div style="position:absolute;left:4px;top:50%;transform:translateY(-50%);font-size:0.7em;color:#ff8888;">\u{1F6E1} ' + dl.priority_soc + '%</div>';
+        h += '<div style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:0.7em;color:#00ff88;">\u{1F50B}\u2192\u{1F697} ab ' + dl.buffer_soc + '%</div>';
+        h += '</div>';
+
+        // Refill reasoning
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.8em;">';
+        if (dl.solar_refill_pct > 1) {
+            h += '<div style="color:#ffdd00;">\u2600\uFE0F Solar: +' + dl.solar_refill_pct + '% (' + dl.solar_surplus_kwh + ' kWh)</div>';
+        }
+        if (dl.grid_refill_pct > 1) {
+            h += '<div style="color:#00d4ff;">\u26A1 G\u00FCnstig-Netz: +' + dl.grid_refill_pct + '% (' + dl.cheap_hours + 'h)</div>';
+        }
+        h += '<div style="color:#ff88ff;">\u{1F697} EV braucht: ' + dl.ev_need_pct + '% (inkl. Verluste)</div>';
+        h += '<div style="color:#888;">\u{1F6E1} Untergrenze: ' + dl.floor_soc + '%</div>';
+        h += '</div>';
+
         h += '</div>';
     }
 
@@ -464,9 +502,10 @@ function renderConfig(s) {
         ['Batterie max', (cfg.battery_max_ct || 0) + 'ct'],
         ['EV max', (cfg.ev_max_ct || 0) + 'ct'],
         ['EV Deadline', cfg.ev_deadline || '--'],
-        ['Bat Lade-Eff.', ((cfg.battery_charge_eff || 0.92) * 100).toFixed(0) + '%'],
-        ['Bat Entlade-Eff.', ((cfg.battery_discharge_eff || 0.92) * 100).toFixed(0) + '%'],
-        ['Bat→EV Min-Vorteil', (cfg.bat_to_ev_min_ct || 3) + 'ct'],
+        ['Roundtrip-Eff.', ((cfg.battery_charge_eff || 0.92) * (cfg.battery_discharge_eff || 0.92) * 100).toFixed(1) + '%'],
+        ['Bat\u2192EV Min-Vorteil', (cfg.bat_to_ev_min_ct || 3) + 'ct'],
+        ['Dynamische Grenze', cfg.bat_to_ev_dynamic ? '\u2705 aktiv' : '\u274C aus'],
+        ['Entlade-Untergrenze', (cfg.bat_to_ev_floor || 20) + '%'],
     ];
     var h = '';
     for (var i = 0; i < rows.length; i++) h += '<tr><td>' + rows[i][0] + '</td><td>' + rows[i][1] + '</td></tr>';

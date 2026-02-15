@@ -52,6 +52,8 @@ class Config:
     battery_charge_efficiency: float = 0.92   # AC→DC charge efficiency
     battery_discharge_efficiency: float = 0.92  # DC→AC discharge efficiency
     battery_to_ev_min_profit_ct: float = 3.0  # Min price difference to justify battery→EV
+    battery_to_ev_dynamic_limit: bool = True  # Dynamically adjust bufferSoc/prioritySoc
+    battery_to_ev_floor_soc: int = 20  # Never discharge below this % for EV support
 
     # --- EV charging ---
     ev_max_price_ct: float = 30.0

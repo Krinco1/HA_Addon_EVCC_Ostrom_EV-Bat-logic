@@ -1,7 +1,7 @@
 name: "EVCC-Smartload - Hybrid Optimizer"
 slug: evcc_smartload
-version: "4.3.6"
-description: "Modulare Architektur · LP Optimizer + Shadow RL · Pro-Device Control · Manueller SoC · Live-Dashboard"
+version: "4.3.7"
+description: "Hybrid LP+RL Optimizer · Batterie→EV Entladung · Dynamische bufferSoc · Solar-Prognose · Mobile Dashboard"
 url: "https://github.com/Krinco1/HA_Addon_EVCC-Smartload"
 arch:
   - aarch64
@@ -30,6 +30,8 @@ options:
   battery_charge_efficiency: 0.92
   battery_discharge_efficiency: 0.92
   battery_to_ev_min_profit_ct: 3.0
+  battery_to_ev_dynamic_limit: true
+  battery_to_ev_floor_soc: 20
   ev_max_price_ct: 30.0
   ev_target_soc: 80
   ev_charge_deadline_hour: 6
@@ -52,6 +54,8 @@ schema:
   battery_charge_efficiency: float?
   battery_discharge_efficiency: float?
   battery_to_ev_min_profit_ct: float?
+  battery_to_ev_dynamic_limit: bool?
+  battery_to_ev_floor_soc: int?
   ev_max_price_ct: float
   ev_target_soc: int
   ev_charge_deadline_hour: int
