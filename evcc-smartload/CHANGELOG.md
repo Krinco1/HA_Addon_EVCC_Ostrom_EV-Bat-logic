@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.3.2 (2026-02-15)
+
+### 🕐 Timestamp-Fix & 📱 Mobile-First Dashboard
+
+**Timestamp-Fix:**
+- Zwei separate Zeitstempel: `last_poll` (wann System gepollt hat) vs `last_update` (wann Fahrzeug gemeldet hat)
+- Dashboard zeigt jetzt "📡 gerade eben" nach erfolgreichem Poll statt falsches "vor 2h"
+- Stale-Warning zeigt Quelle: "Letzte Fahrzeugmeldung: vor 2h 13min (evcc)"
+
+**Mobile-First Dashboard:**
+- Status-Karten: 2×2 Grid auf Mobile, 4-spaltig ab 600px
+- Device-Header: vertikal gestapelt auf Mobile
+- Chart: kleinere Bars/Labels auf Mobile, scrollbar
+- Energiebilanz: 2-spaltig auf Mobile, auto-fit ab Tablet
+- RL-Tabelle: horizontal scrollbar auf Mobile
+- Touch-freundliche Buttons (größer auf Touch-Geräten)
+- Kein horizontaler Overflow mehr
+
+---
+
 ## v4.3.1 (2026-02-15)
 
 ### ☀️ PV-bewusste Ladeplanung & Energiebilanz

@@ -265,6 +265,10 @@ class WebServer:
                     "charge_needed_kwh": needs.get(name, 0),
                     "data_source": v.data_source,
                     "last_update": v.last_update.isoformat() if v.last_update else None,
+                    "last_poll": v.last_poll.isoformat() if v.last_poll else None,
+                    "poll_age": v.get_poll_age_string(),
+                    "data_age": v.get_data_age_string(),
+                    "is_stale": v.is_data_stale(),
                 }
                 for name, v in vehicles.items()
             },
@@ -455,7 +459,7 @@ class WebServer:
 </style></head><body><div class="c">
 <h1>📚 EVCC-Smartload v{VERSION} Dokumentation</h1>
 <a href="/docs/readme"><div class="card"><h2>📖 README</h2><p>Installation, Konfiguration, Features, API, FAQ</p></div></a>
-<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.1</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
+<a href="/docs/changelog"><div class="card"><h2>📝 Changelog v4.3.2</h2><p>Was ist neu? Breaking Changes, neue Features</p></div></a>
 <a href="/docs/api"><div class="card"><h2>🔌 API Referenz</h2><p>Alle Endpunkte mit Beispielen</p></div></a>
 <p style="text-align:center;margin-top:30px;"><a href="/">← Dashboard</a></p>
 </div></body></html>"""
@@ -607,6 +611,12 @@ def _calculate_charge_slots(tariffs, cfg, last_state, vehicles) -> dict:
             v.last_update.isoformat() if v.last_update else None,
             pv_offset_kwh=pv_per_vehicle if needs_charge else 0,
         )
+        # Add poll/stale info
+        result["vehicles"][name]["last_poll"] = v.last_poll.isoformat() if v.last_poll else None
+        result["vehicles"][name]["poll_age"] = v.get_poll_age_string()
+        result["vehicles"][name]["data_age"] = v.get_data_age_string()
+        result["vehicles"][name]["is_stale"] = v.is_data_stale()
+        result["vehicles"][name]["data_source"] = v.data_source
     return result
 
 

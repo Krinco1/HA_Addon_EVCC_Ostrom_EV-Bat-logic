@@ -109,11 +109,12 @@ class VehicleStatus:
     soc: float
     capacity_kwh: float
     range_km: float
-    last_update: datetime
+    last_update: datetime  # when the vehicle DATA was generated (car timestamp)
     connected_to_wallbox: bool = False
     charging: bool = False
     data_source: str = "evcc"  # 'evcc', 'direct_api', 'cache', 'manual'
     provider_type: str = "evcc"
+    last_poll: Optional[datetime] = None  # when WE last successfully polled
 
     # Manual SoC override
     manual_soc: Optional[float] = None
@@ -130,16 +131,30 @@ class VehicleStatus:
                 return self.manual_soc
         return self.soc
 
+    def get_poll_age_string(self) -> str:
+        """How long ago we last polled (not how old the data is)."""
+        ts = self.last_poll or self.last_update
+        if not ts:
+            return "unbekannt"
+        age = datetime.now(timezone.utc) - ts
+        minutes = int(age.total_seconds() / 60)
+        if minutes < 1:
+            return "gerade eben"
+        if minutes < 60:
+            return f"vor {minutes}min"
+        return f"vor {int(minutes / 60)}h {minutes % 60}min"
+
     def get_data_age_string(self) -> str:
+        """How old the actual vehicle data is."""
         if not self.last_update:
             return "unbekannt"
         age = datetime.now(timezone.utc) - self.last_update
         minutes = int(age.total_seconds() / 60)
         if minutes < 1:
-            return "vor 0min"
+            return "gerade eben"
         if minutes < 60:
             return f"vor {minutes}min"
-        return f"vor {int(minutes / 60)}h"
+        return f"vor {int(minutes / 60)}h {minutes % 60}min"
 
     def is_data_stale(self, threshold_minutes: int = 60) -> bool:
         if not self.last_update:

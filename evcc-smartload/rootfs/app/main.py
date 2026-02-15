@@ -1,5 +1,5 @@
 """
-EVCC-Smartload v4.3.1 – Hybrid LP + Shadow RL Optimizer
+EVCC-Smartload v4.3.2 – Hybrid LP + Shadow RL Optimizer
 
 Entry point. Initialises all components and runs the main decision loop.
 """

@@ -99,6 +99,64 @@
         .links a { color: #00d4ff; text-decoration: none; }
         .links a:hover { text-decoration: underline; }
         .btn-manual { background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9em; }
+
+        /* ============ MOBILE FIRST ============ */
+        /* Base: mobile (< 600px) */
+        .container { max-width: 1100px; margin: 0 auto; padding: 10px; }
+        .header h1 { font-size: 1.2em; }
+        .status-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .status-card { padding: 10px; }
+        .status-card .value { font-size: 1.3em; }
+        .device-header { flex-direction: column; align-items: flex-start; }
+        .device-name { font-size: 1em; }
+        .chart-wrap { height: 160px; }
+        .chart-bar { min-width: 16px; }
+        .chart-bar .bar-label { font-size: 0.5em; }
+        .chart-bar .bar-value { font-size: 0.55em; }
+        .eb-item { padding: 8px; }
+        .eb-value { font-size: 1.1em; }
+        .slot { min-width: 70px; padding: 8px; }
+        .rl-devices-table { display: block; overflow-x: auto; white-space: nowrap; }
+        .summary { gap: 12px; }
+        .summary-value { font-size: 1em; }
+        .modal-box { padding: 20px; }
+
+        /* Tablet (600px+) */
+        @media (min-width: 600px) {
+            .container { padding: 15px; }
+            .header h1 { font-size: 1.5em; }
+            .status-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+            .status-card { padding: 15px; }
+            .status-card .value { font-size: 1.6em; }
+            .device-header { flex-direction: row; align-items: center; }
+            .device-name { font-size: 1.15em; }
+            .chart-wrap { height: 180px; }
+            .chart-bar { min-width: 22px; }
+            .chart-bar .bar-label { font-size: 0.6em; }
+            .chart-bar .bar-value { font-size: 0.65em; }
+            .eb-item { padding: 12px; }
+            .eb-value { font-size: 1.3em; }
+            #energyBalance { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; gap: 10px !important; }
+            .slot { min-width: 80px; padding: 10px; }
+            .rl-devices-table { display: table; overflow-x: visible; white-space: normal; }
+            .summary-value { font-size: 1.2em; }
+        }
+
+        /* Desktop (900px+) */
+        @media (min-width: 900px) {
+            .container { padding: 20px; }
+        }
+
+        /* Touch-friendly buttons on mobile */
+        @media (hover: none) and (pointer: coarse) {
+            .mode-btn { padding: 8px 16px; font-size: 0.9em; }
+            .btn-manual { padding: 10px 18px; }
+            .btn-cancel, .btn-save { padding: 12px; }
+        }
+
+        /* Prevent horizontal overflow */
+        html, body { overflow-x: hidden; }
+        img, table, pre { max-width: 100%; }
     </style>
 </head>
 <body>
@@ -137,7 +195,7 @@
     <!-- Energy balance -->
     <div class="device-card" id="energyBalanceCard">
         <h3 style="margin-bottom: 12px;">⚡ Energiebilanz</h3>
-        <div id="energyBalance" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+        <div id="energyBalance" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
         </div>
     </div>
 

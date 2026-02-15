@@ -127,6 +127,7 @@ class VehicleMonitor:
                             capacity_kwh=vs.capacity_kwh,
                             range_km=vs.data.range_km if vs.data else 0,
                             last_update=vs.data.timestamp if vs.data else now,
+                            last_poll=now,
                             connected_to_wallbox=vs.evcc_connected,
                             charging=vs.data.is_charging if vs.data else False,
                             data_source=vs.data_source,
@@ -162,6 +163,7 @@ class VehicleMonitor:
             existing = self.vehicles.get(name)
             # Don't overwrite direct_api data
             if existing and existing.data_source == "direct_api" and existing.soc > 0:
+                existing.last_poll = now  # We polled successfully, just kept old data
                 if name in connected:
                     existing.connected_to_wallbox = True
                     existing.charging = connected[name].get("charging", False)
@@ -179,6 +181,7 @@ class VehicleMonitor:
                 capacity_kwh=capacity,
                 range_km=data.get("range", 0),
                 last_update=now,
+                last_poll=now,
                 connected_to_wallbox=name in connected,
                 charging=connected.get(name, {}).get("charging", False),
                 data_source="evcc",

@@ -1,5 +1,5 @@
 /**
- * EVCC-Smartload Dashboard v4.3.1
+ * EVCC-Smartload Dashboard v4.3.2
  *
  * Fetches /status, /slots, /vehicles, /strategy, /chart-data, /rl-devices
  * Auto-refreshes every 60 seconds.
@@ -186,30 +186,37 @@ function renderDevice(dev, deviceId, vehicleInfo) {
     var need = dev.need_kwh || 0;
     var statusText = dev.status || '';
     var slots = dev.slots || [];
-    var lastUpdate = dev.last_update || '';
     var icon = dev.icon || '\u{1F50B}';
     var name = dev.name || deviceId;
-    var age = ageText(lastUpdate);
+
+    // Use server-computed age strings
+    var pollAge = dev.poll_age || vehicleInfo?.poll_age || '';
+    var dataAge = dev.data_age || vehicleInfo?.data_age || '';
+    var isStale = dev.is_stale || vehicleInfo?.is_stale || false;
+    var dataSource = dev.data_source || vehicleInfo?.data_source || 'evcc';
 
     var isManual = vehicleInfo && vehicleInfo.manual_soc != null && vehicleInfo.manual_soc > 0;
     var displaySoc = soc;
     if (isManual && soc === 0) displaySoc = vehicleInfo.manual_soc;
 
-    var isStale = lastUpdate && (Date.now() - new Date(lastUpdate).getTime()) > 3600000 && displaySoc > 0;
     var showManualBtn = deviceId !== 'battery' && ((soc === 0 && !isManual) || deviceId.toLowerCase().includes('ora') || isManual);
 
     var h = '<div class="device-card">';
     h += '<div class="device-header"><div>';
     h += '<span class="device-name">' + icon + ' ' + name + '</span>';
     h += ' <span style="color:#888;margin-left:10px;">' + cap.toFixed(0) + ' kWh</span>';
-    if (age) h += ' <span style="margin-left:10px;font-size:0.85em;">' + age + '</span>';
+    // Show poll time (when we last checked), not data age
+    if (pollAge && deviceId !== 'battery') {
+        var pollColor = pollAge.includes('gerade') ? '#00ff88' : '#ffaa00';
+        h += ' <span style="margin-left:10px;font-size:0.85em;color:' + pollColor + ';">\u{1F4E1} ' + pollAge + '</span>';
+    }
     if (isManual) h += ' <span class="manual-badge">\u270F\uFE0F manuell: ' + vehicleInfo.manual_soc.toFixed(0) + '%</span>';
     h += '</div><div class="device-status">' + statusText + '</div></div>';
 
-    if (isStale) {
-        var min = Math.floor((Date.now() - new Date(lastUpdate).getTime()) / 60000);
-        h += '<div class="stale-warning"><strong style="color:#ffaa00;">\u26A0\uFE0F Daten veraltet</strong><br>';
-        h += '<span style="font-size:0.85em;color:#888;">Letztes Update vor ' + Math.floor(min/60) + 'h ' + (min%60) + 'min.</span></div>';
+    // Stale warning: shows DATA age (how old the vehicle's own data is)
+    if (isStale && displaySoc > 0 && deviceId !== 'battery') {
+        h += '<div class="stale-warning"><strong style="color:#ffaa00;">\u26A0\uFE0F Fahrzeug-Daten veraltet</strong><br>';
+        h += '<span style="font-size:0.85em;color:#888;">Letzte Fahrzeugmeldung: ' + dataAge + ' (' + dataSource + ')</span></div>';
     }
 
     var sColor = socColor(displaySoc);
