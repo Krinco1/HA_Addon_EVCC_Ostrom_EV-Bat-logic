@@ -1,0 +1,34 @@
+# /config/drivers.yaml
+# EVCC-Smartload v5.0 — Fahrer-EV-Zuordnung + Telegram Notifications
+#
+# OPTIONAL: Ohne diese Datei läuft das System wie v4 (keine Notifications).
+# Mit dieser Datei kannst du Fahrern EVs zuordnen und Telegram-Benachrichtigungen
+# für Ladeanfragen, Umsteck-Hinweise und Fertig-Meldungen aktivieren.
+#
+# --- Schritt 1: Telegram Bot erstellen ---
+# 1. Öffne Telegram und suche nach @BotFather
+# 2. Sende /newbot und folge den Anweisungen
+# 3. Kopiere den Token (z.B. 123456:ABC-DEF...) hierher
+#
+# --- Schritt 2: Chat-ID ermitteln ---
+# 1. Sende deinem Bot eine Nachricht: /start
+# 2. Öffne: https://api.telegram.org/bot<TOKEN>/getUpdates
+# 3. Suche nach "chat":{"id": XXXXXXXX} — das ist deine Chat-ID
+#
+# --- Schritt 3: vehicles.yaml Abgleich ---
+# Fahrzeugnamen müssen exakt mit evcc_name in vehicles.yaml übereinstimmen
+# (nicht case-sensitive)
+
+telegram_bot_token: ""   # Leer = Notifications komplett deaktiviert
+
+drivers:
+  - name: "Nico"
+    vehicles:
+      - "KIA_EV9"        # Muss mit evcc_name in vehicles.yaml übereinstimmen
+    telegram_chat_id: 0  # Ersetze mit deiner Chat-ID (Zahl, kein String)
+
+  - name: "Fahrer2"
+    vehicles:
+      - "ora_03"
+      - "my_Twingo"
+    telegram_chat_id: 0  # Ersetze mit deiner Chat-ID
