@@ -26,21 +26,18 @@
         /* Chart */
         .chart-card { background: #16213e; border-radius: 10px; padding: 18px; margin-bottom: 15px; }
         .chart-title { font-size: 1em; font-weight: bold; margin-bottom: 10px; }
-        .chart-wrap { position: relative; height: 180px; overflow-x: auto; }
-        .chart-bars { display: flex; align-items: flex-end; gap: 2px; height: 150px; padding-bottom: 22px; }
-        .chart-bar { flex: 1; min-width: 22px; border-radius: 3px 3px 0 0; position: relative; cursor: default; transition: opacity 0.2s; }
-        .chart-bar:hover { opacity: 0.8; }
-        .chart-bar .bar-label { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 0.6em; color: #666; white-space: nowrap; }
-        .chart-bar .bar-value { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 0.65em; white-space: nowrap; font-weight: bold; }
-        .chart-bar.now { border: 2px solid #00d4ff; box-shadow: 0 0 8px rgba(0,212,255,0.4); }
-        .chart-limit { position: absolute; left: 0; right: 0; border-top: 2px dashed; pointer-events: none; z-index: 2; }
-        .chart-limit .limit-label { position: absolute; right: 4px; top: -14px; font-size: 0.65em; }
+        .chart-wrap { position: relative; width: 100%; }
+        .chart-svg { width: 100%; display: block; }
         .chart-legend { display: flex; gap: 15px; margin-top: 8px; font-size: 0.8em; color: #888; flex-wrap: wrap; }
         .chart-legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
         .legend-cheap::before { background: #00ff88; }
         .legend-mid::before { background: #ffaa00; }
         .legend-exp::before { background: #ff4444; }
-        .legend-solar::before { background: transparent; border-bottom: 3px solid #ffdd00; border-radius: 0; height: 6px; position: relative; top: -2px; }
+        .legend-solar::before { background: rgba(255,221,0,0.25); border: 1px solid #ffdd00; border-radius: 0; }
+        .chart-tooltip { position: absolute; background: #0f3460; border: 1px solid #555; border-radius: 6px; padding: 8px 12px; font-size: 0.82em; pointer-events: none; z-index: 20; white-space: nowrap; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .chart-tooltip .tt-time { color: #00d4ff; font-weight: bold; }
+        .chart-tooltip .tt-price { font-size: 1.1em; }
+        .chart-tooltip .tt-solar { color: #ffdd00; }
 
         /* Energy balance mini cards */
         .eb-item { background: #0f3460; border-radius: 8px; padding: 12px; text-align: center; }
@@ -110,10 +107,6 @@
         .status-card .value { font-size: 1.3em; }
         .device-header { flex-direction: column; align-items: flex-start; }
         .device-name { font-size: 1em; }
-        .chart-wrap { height: 160px; }
-        .chart-bar { min-width: 16px; }
-        .chart-bar .bar-label { font-size: 0.5em; }
-        .chart-bar .bar-value { font-size: 0.55em; }
         .eb-item { padding: 8px; }
         .eb-value { font-size: 1.1em; }
         .slot { min-width: 70px; padding: 8px; }
@@ -131,10 +124,6 @@
             .status-card .value { font-size: 1.6em; }
             .device-header { flex-direction: row; align-items: center; }
             .device-name { font-size: 1.15em; }
-            .chart-wrap { height: 180px; }
-            .chart-bar { min-width: 22px; }
-            .chart-bar .bar-label { font-size: 0.6em; }
-            .chart-bar .bar-value { font-size: 0.65em; }
             .eb-item { padding: 12px; }
             .eb-value { font-size: 1.3em; }
             #energyBalance { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; gap: 10px !important; }
@@ -184,7 +173,7 @@
     <div class="chart-card">
         <div class="chart-title">📊 Strompreis & Solar-Prognose</div>
         <div class="chart-wrap" id="chartWrap">
-            <div class="chart-bars" id="chartBars"></div>
+            <div class="chart-tooltip" id="chartTooltip"></div>
         </div>
         <div class="chart-legend">
             <span class="legend-cheap">Günstig (&lt;25ct)</span>

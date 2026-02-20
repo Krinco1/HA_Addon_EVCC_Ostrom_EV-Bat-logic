@@ -87,138 +87,196 @@ function renderStrategy(s) {
     }
 }
 
-// ---- Price chart ----
+// ---- Price chart (SVG) ----
 function renderChart(data) {
     var prices = data.prices || [];
-    if (!prices.length) { $('chartBars').innerHTML = '<div style="color:#888;padding:20px;">Keine Preisdaten</div>'; return; }
+    var wrap = $('chartWrap');
+    if (!prices.length) { wrap.innerHTML = '<div style="color:#888;padding:20px;">Keine Preisdaten</div>'; return; }
 
-    var maxPrice = Math.max.apply(null, prices.map(function(p){ return p.price_ct; }).concat([40]));
     var batLimit = data.battery_max_ct || 35;
     var evLimit = data.ev_max_ct || 40;
-
-    var html = '';
-    // Check if we have solar data
     var hasSolar = data.has_solar_forecast || false;
-    var maxSolar = hasSolar ? Math.max.apply(null, prices.map(function(p){ return p.solar_kw || 0; }).concat([1])) : 0;
 
-    for (var i = 0; i < prices.length; i++) {
-        var p = prices[i];
-        var h = Math.max(2, (p.price_ct / maxPrice) * 120);
-        var col = priceColor(p.price_ct);
-        var cls = p.is_now ? ' now' : '';
-        var solarKw = p.solar_kw || 0;
-        var title = p.hour + ': ' + p.price_ct.toFixed(1) + 'ct';
-        if (solarKw > 0) title += ' | \u2600\uFE0F ' + solarKw.toFixed(1) + 'kW';
+    // --- Layout constants ---
+    var marginL = 38, marginR = hasSolar ? 42 : 12, marginT = 18, marginB = 32;
+    var n = prices.length;
+    // Responsive: measure container width
+    var containerW = wrap.clientWidth || 700;
+    var W = containerW;
+    var H = 200;
+    var plotW = W - marginL - marginR;
+    var plotH = H - marginT - marginB;
 
-        html += '<div class="chart-bar' + cls + '" style="height:' + h + 'px;background:' + col + ';" title="' + title + '">';
-        html += '<span class="bar-value" style="color:' + col + ';">' + p.price_ct.toFixed(1) + '</span>';
-        html += '<span class="bar-label">' + p.hour + '</span>';
-        html += '</div>';
+    var maxPrice = Math.max.apply(null, prices.map(function(p){ return p.price_ct; }));
+    maxPrice = Math.max(maxPrice, evLimit + 2, 30);
+    // Round up to nearest 5
+    maxPrice = Math.ceil(maxPrice / 5) * 5;
+
+    var maxSolar = 0;
+    if (hasSolar) {
+        maxSolar = Math.max.apply(null, prices.map(function(p){ return p.solar_kw || 0; }).concat([0.5]));
+        maxSolar = Math.ceil(maxSolar);
     }
-    $('chartBars').innerHTML = html;
 
-    // Limit lines + solar cleanup
-    var wrap = $('chartWrap');
-    var existing = wrap.querySelectorAll('.chart-limit,.solar-summary,.solar-overlay');
-    for (var j = 0; j < existing.length; j++) existing[j].remove();
+    var barW = plotW / n;
+    var barGap = Math.max(1, barW * 0.12);
+    var barInner = barW - barGap;
 
-    function addLimit(val, label, color) {
-        var pct = (val / maxPrice) * 120;
-        var bottom = pct + 22;
-        var el = document.createElement('div');
-        el.className = 'chart-limit';
-        el.style.bottom = bottom + 'px';
-        el.style.borderTopColor = color;
-        el.innerHTML = '<span class="limit-label" style="color:' + color + ';">' + label + '</span>';
-        wrap.appendChild(el);
+    // --- Build SVG ---
+    var s = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+
+    // Defs for gradients and filters
+    s += '<defs>';
+    s += '<linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">';
+    s += '<stop offset="0%" stop-color="#ffdd00" stop-opacity="0.35"/>';
+    s += '<stop offset="100%" stop-color="#ffdd00" stop-opacity="0.05"/>';
+    s += '</linearGradient>';
+    s += '<filter id="glowNow"><feGaussianBlur stdDeviation="3" result="blur"/>';
+    s += '<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+    s += '</defs>';
+
+    // Y-axis grid lines + labels (price)
+    var ySteps = maxPrice <= 30 ? 5 : (maxPrice <= 50 ? 5 : 10);
+    for (var yv = 0; yv <= maxPrice; yv += ySteps) {
+        var yy = marginT + plotH - (yv / maxPrice) * plotH;
+        s += '<line x1="' + marginL + '" y1="' + yy + '" x2="' + (W - marginR) + '" y2="' + yy + '" stroke="#333" stroke-width="0.5"/>';
+        s += '<text x="' + (marginL - 4) + '" y="' + (yy + 3) + '" fill="#666" font-size="9" text-anchor="end" font-family="sans-serif">' + yv + '</text>';
     }
-    addLimit(batLimit, '\u{1F50B} ' + batLimit + 'ct', '#00d4ff');
-    if (evLimit !== batLimit) addLimit(evLimit, '\u{1F50C} ' + evLimit + 'ct', '#ff88ff');
+    // Y-axis label
+    s += '<text x="6" y="' + (marginT + plotH / 2) + '" fill="#888" font-size="8" text-anchor="middle" font-family="sans-serif" transform="rotate(-90,6,' + (marginT + plotH / 2) + ')">ct/kWh</text>';
 
-    // Solar forecast: SVG line + area overlay
+    // Solar Y-axis (right side)
     if (hasSolar && maxSolar > 0.1) {
-        var bars = $('chartBars');
-        var barEls = bars.querySelectorAll('.chart-bar');
-        if (barEls.length > 0) {
-            var svgNS = 'http://www.w3.org/2000/svg';
-            var svg = document.createElementNS(svgNS, 'svg');
-            svg.setAttribute('class', 'solar-overlay');
-            svg.style.cssText = 'position:absolute;left:0;right:0;bottom:22px;height:120px;pointer-events:none;z-index:5;overflow:visible;';
+        for (var sv = 0; sv <= maxSolar; sv += Math.max(1, Math.ceil(maxSolar / 4))) {
+            var sy = marginT + plotH - (sv / maxSolar) * plotH;
+            s += '<text x="' + (W - marginR + 4) + '" y="' + (sy + 3) + '" fill="#998800" font-size="8" font-family="sans-serif">' + sv + '</text>';
+        }
+        s += '<text x="' + (W - 5) + '" y="' + (marginT + plotH / 2) + '" fill="#998800" font-size="8" text-anchor="middle" font-family="sans-serif" transform="rotate(90,' + (W - 5) + ',' + (marginT + plotH / 2) + ')">kW ☀</text>';
+    }
 
-            var points = [];
-            for (var si = 0; si < prices.length; si++) {
-                var skw = prices[si].solar_kw || 0;
-                var barEl = barEls[si];
-                if (!barEl) continue;
-                var xCenter = barEl.offsetLeft + barEl.offsetWidth / 2;
-                var yVal = 120 - (skw / maxSolar) * 105;
-                points.push({x: xCenter, y: yVal, kw: skw});
-            }
+    // Solar area (drawn BEFORE bars so bars are on top)
+    if (hasSolar && maxSolar > 0.1) {
+        var solarPts = '';
+        var firstX = marginL + barW * 0.5;
+        for (var si = 0; si < n; si++) {
+            var skw = prices[si].solar_kw || 0;
+            var sx = marginL + si * barW + barW * 0.5;
+            var sy2 = marginT + plotH - (skw / maxSolar) * plotH;
+            solarPts += (si === 0 ? 'M' : 'L') + sx.toFixed(1) + ',' + sy2.toFixed(1) + ' ';
+        }
+        // Close area
+        var lastX = marginL + (n - 1) * barW + barW * 0.5;
+        var baseY = marginT + plotH;
+        s += '<path d="' + solarPts + 'L' + lastX.toFixed(1) + ',' + baseY + ' L' + firstX.toFixed(1) + ',' + baseY + ' Z" fill="url(#solarGrad)" />';
+        s += '<path d="' + solarPts + '" fill="none" stroke="#ffdd00" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>';
+    }
 
-            if (points.length > 1) {
-                // Filled area (subtle)
-                var areaPts = points.map(function(pt){return pt.x+','+pt.y;}).join(' ');
-                areaPts += ' ' + points[points.length-1].x + ',120 ' + points[0].x + ',120';
-                var area = document.createElementNS(svgNS, 'polygon');
-                area.setAttribute('points', areaPts);
-                area.setAttribute('fill', 'rgba(255,221,0,0.10)');
-                svg.appendChild(area);
+    // Limit lines
+    function limitY(ct) { return marginT + plotH - (ct / maxPrice) * plotH; }
 
-                // Line (clear yellow)
-                var linePts = points.map(function(pt){return pt.x+','+pt.y;}).join(' ');
-                var line = document.createElementNS(svgNS, 'polyline');
-                line.setAttribute('points', linePts);
-                line.setAttribute('fill', 'none');
-                line.setAttribute('stroke', '#ffdd00');
-                line.setAttribute('stroke-width', '2.5');
-                line.setAttribute('stroke-linejoin', 'round');
-                line.setAttribute('stroke-linecap', 'round');
-                svg.appendChild(line);
+    var batY = limitY(batLimit);
+    s += '<line x1="' + marginL + '" y1="' + batY + '" x2="' + (W - marginR) + '" y2="' + batY + '" stroke="#00d4ff" stroke-width="1" stroke-dasharray="6,3" opacity="0.7"/>';
+    s += '<text x="' + (W - marginR - 2) + '" y="' + (batY - 3) + '" fill="#00d4ff" font-size="8" text-anchor="end" font-family="sans-serif">🔋 ' + batLimit + 'ct</text>';
 
-                // Dots at each data point
-                for (var di = 0; di < points.length; di++) {
-                    if (points[di].kw > 0.1) {
-                        var dot = document.createElementNS(svgNS, 'circle');
-                        dot.setAttribute('cx', points[di].x);
-                        dot.setAttribute('cy', points[di].y);
-                        dot.setAttribute('r', '3');
-                        dot.setAttribute('fill', '#ffdd00');
-                        dot.setAttribute('stroke', '#1a1a2e');
-                        dot.setAttribute('stroke-width', '1.5');
-                        svg.appendChild(dot);
-                    }
-                }
+    if (Math.abs(evLimit - batLimit) > 1) {
+        var evY = limitY(evLimit);
+        s += '<line x1="' + marginL + '" y1="' + evY + '" x2="' + (W - marginR) + '" y2="' + evY + '" stroke="#ff88ff" stroke-width="1" stroke-dasharray="6,3" opacity="0.7"/>';
+        s += '<text x="' + (W - marginR - 2) + '" y="' + (evY - 3) + '" fill="#ff88ff" font-size="8" text-anchor="end" font-family="sans-serif">🔌 ' + evLimit + 'ct</text>';
+    }
 
-                // Max kW label
-                var maxLabel = document.createElementNS(svgNS, 'text');
-                maxLabel.setAttribute('x', points[points.length-1].x - 5);
-                maxLabel.setAttribute('y', '12');
-                maxLabel.setAttribute('fill', '#ffdd00');
-                maxLabel.setAttribute('font-size', '10');
-                maxLabel.setAttribute('text-anchor', 'end');
-                maxLabel.setAttribute('font-family', '-apple-system, sans-serif');
-                maxLabel.textContent = '\u2600 max ' + maxSolar.toFixed(1) + 'kW';
-                svg.appendChild(maxLabel);
-            }
+    // Price bars
+    for (var i = 0; i < n; i++) {
+        var p = prices[i];
+        var barH = Math.max(1, (p.price_ct / maxPrice) * plotH);
+        var bx = marginL + i * barW + barGap / 2;
+        var by = marginT + plotH - barH;
+        var col = priceColor(p.price_ct);
 
-            wrap.appendChild(svg);
+        // Current hour glow
+        if (p.is_now) {
+            s += '<rect x="' + (bx - 1) + '" y="' + (by - 1) + '" width="' + (barInner + 2) + '" height="' + (barH + 2) + '" rx="2" fill="none" stroke="#00d4ff" stroke-width="2" filter="url(#glowNow)" opacity="0.6"/>';
+        }
+
+        // Bar with hover area
+        s += '<rect x="' + bx + '" y="' + by + '" width="' + barInner + '" height="' + barH + '" rx="1.5" fill="' + col + '" opacity="' + (p.is_now ? '1' : '0.85') + '" data-idx="' + i + '" class="price-bar" style="cursor:pointer;"/>';
+
+        // Price label inside bar (only if bar is tall enough)
+        if (barH > 18 && barInner > 14) {
+            var labelSize = barInner > 20 ? 9 : 7;
+            s += '<text x="' + (bx + barInner / 2) + '" y="' + (by + barH / 2 + 3) + '" fill="#000" font-size="' + labelSize + '" text-anchor="middle" font-weight="bold" font-family="sans-serif" pointer-events="none">';
+            s += p.price_ct.toFixed(0);
+            s += '</text>';
+        } else if (barH > 8 && barInner > 10) {
+            // Tiny label above bar
+            s += '<text x="' + (bx + barInner / 2) + '" y="' + (by - 2) + '" fill="' + col + '" font-size="7" text-anchor="middle" font-family="sans-serif" pointer-events="none">' + p.price_ct.toFixed(0) + '</text>';
+        }
+
+        // X-axis time labels (smart spacing: show every N hours based on bar count)
+        var hourNum = parseInt(p.hour);
+        var showLabel = false;
+        if (n <= 24) showLabel = (hourNum % 3 === 0);
+        else if (n <= 48) showLabel = (hourNum % 6 === 0) || (i === 0);
+        else showLabel = (hourNum % 6 === 0) || (i === 0);
+        // Always show current hour
+        if (p.is_now) showLabel = true;
+
+        if (showLabel) {
+            var lx = bx + barInner / 2;
+            var ly = marginT + plotH + 14;
+            s += '<text x="' + lx + '" y="' + ly + '" fill="' + (p.is_now ? '#00d4ff' : '#888') + '" font-size="9" text-anchor="middle" font-family="sans-serif" font-weight="' + (p.is_now ? 'bold' : 'normal') + '">' + p.hour + '</text>';
+        }
+
+        // "Now" marker arrow
+        if (p.is_now) {
+            s += '<text x="' + (bx + barInner / 2) + '" y="' + (marginT + plotH + 26) + '" fill="#00d4ff" font-size="8" text-anchor="middle" font-family="sans-serif">▲ jetzt</text>';
         }
     }
 
-    // Solar summary line below chart
+    s += '</svg>';
+    wrap.innerHTML = s + '<div class="chart-tooltip" id="chartTooltip"></div>';
+
+    // --- Tooltip on hover ---
+    var tooltip = $('chartTooltip');
+    var bars = wrap.querySelectorAll('.price-bar');
+    for (var b = 0; b < bars.length; b++) {
+        bars[b].addEventListener('mouseenter', function(e) {
+            var idx = parseInt(this.getAttribute('data-idx'));
+            var p = prices[idx];
+            if (!p) return;
+            var html = '<div class="tt-time">' + p.hour + ':00</div>';
+            html += '<div class="tt-price" style="color:' + priceColor(p.price_ct) + ';">' + p.price_ct.toFixed(1) + ' ct/kWh</div>';
+            if (p.solar_kw > 0) html += '<div class="tt-solar">☀️ ' + p.solar_kw.toFixed(1) + ' kW</div>';
+            if (p.price_ct <= batLimit) html += '<div style="color:#00d4ff;font-size:0.9em;">🔋 Batterie-Laden ✓</div>';
+            if (p.price_ct <= evLimit) html += '<div style="color:#ff88ff;font-size:0.9em;">🔌 EV-Laden ✓</div>';
+            tooltip.innerHTML = html;
+            tooltip.style.display = 'block';
+        });
+        bars[b].addEventListener('mousemove', function(e) {
+            var rect = wrap.getBoundingClientRect();
+            var x = e.clientX - rect.left + 10;
+            var y = e.clientY - rect.top - 10;
+            if (x + 140 > rect.width) x = x - 160;
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        });
+        bars[b].addEventListener('mouseleave', function() {
+            tooltip.style.display = 'none';
+        });
+    }
+
+    // Solar summary line
     var pvKw = data.pv_now_kw || 0;
-    var summaryEl = document.createElement('div');
-    summaryEl.className = 'solar-summary';
-    summaryEl.style.cssText = 'display:flex;justify-content:space-between;font-size:0.85em;margin-top:4px;flex-wrap:wrap;gap:8px;';
     var summaryHtml = '';
-    if (pvKw > 0) summaryHtml += '<span style="color:#ffdd00;">\u2600\uFE0F Aktuell: ' + pvKw.toFixed(1) + ' kW PV</span>';
+    if (pvKw > 0) summaryHtml += '<span style="color:#ffdd00;">☀️ Aktuell: ' + pvKw.toFixed(1) + ' kW PV</span>';
     if (hasSolar) {
         var totalKwh = data.solar_total_kwh || 0;
-        summaryHtml += '<span style="color:#ffdd00;">\u{1F4C8} Prognose: ' + totalKwh.toFixed(0) + ' kWh heute</span>';
+        summaryHtml += '<span style="color:#ffdd00;">📈 Prognose: ' + totalKwh.toFixed(0) + ' kWh</span>';
     }
     if (summaryHtml) {
-        summaryEl.innerHTML = summaryHtml;
-        wrap.appendChild(summaryEl);
+        var sumEl = document.createElement('div');
+        sumEl.style.cssText = 'display:flex;justify-content:space-between;font-size:0.85em;margin-top:4px;flex-wrap:wrap;gap:8px;';
+        sumEl.innerHTML = summaryHtml;
+        wrap.appendChild(sumEl);
     }
 }
 

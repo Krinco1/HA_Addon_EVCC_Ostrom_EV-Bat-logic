@@ -28,6 +28,18 @@
 - Neuer API-Endpoint `/decisions` für Dashboard und Debugging
 - Zeigt RL-Entscheidungen transparent: RL aktiv/inaktiv, Win-Rate, Abweichungen von LP
 
+**📊 Chart komplett neu designt (SVG):**
+- Altes System: 48+ CSS-Div-Balken mit externem Scroll → unleserlich
+- Neues System: Responsive SVG mit viewBox, skaliert auf jede Bildschirmgröße
+- Preise INNERHALB der Balken (schwarze Zahl auf Farb-Hintergrund)
+- Intelligente Zeitachse: Labels nur alle 3h (24h-Ansicht) oder 6h (48h)
+- "Jetzt"-Markierung: Cyan-Glow + ▲ Pfeil
+- Solar-Prognose als gefüllte Fläche (gelber Gradient) mit eigener Y-Achse
+- Y-Achse links: ct/kWh Skala, Y-Achse rechts: kW Solar
+- Limit-Linien (Batterie 🔋 / EV 🔌) als gestrichelte Linien mit Label
+- Tooltip bei Hover: Uhrzeit, Preis, Solar, Lade-Empfehlung
+- Kein horizontales Scrollen mehr nötig
+
 ---
 
 ## v4.3.9 (2026-02-15)
