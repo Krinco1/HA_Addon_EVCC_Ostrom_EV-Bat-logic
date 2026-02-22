@@ -12,7 +12,7 @@ SmartLoad v6 transforms a reliable reactive optimizer into a proactive 24-48h pr
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: State Infrastructure** - Thread-safe StateStore and startup config validation eliminate race conditions and misconfiguration crashes
+- [x] **Phase 1: State Infrastructure** - Thread-safe StateStore and startup config validation eliminate race conditions and misconfiguration crashes
 - [ ] **Phase 2: Vehicle Reliability** - Accurate live vehicle SoC, immediate charge sequencer transitions, and bounded RL bootstrap memory
 - [ ] **Phase 3: Data Foundation** - Consumption history forecasting from HA/InfluxDB and PV generation estimates from evcc solar tariff integrated into planning inputs
 - [ ] **Phase 4: Predictive Planner** - Rolling-horizon 24-48h LP optimizer replaces static euro price limits with joint battery and EV dispatch planning
@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Thread-safe StateStore with RLock, SSE push, and web server migration to read-only
-- [ ] 01-02-PLAN.md — Config validation with critical/non-critical classification and startup error page
+- [x] 01-02-PLAN.md — Config validation with critical/non-critical classification and startup error page
 
 ### Phase 2: Vehicle Reliability
 **Goal**: Vehicle SoC is always current and correct, charge transitions happen within one decision cycle, and the RL bootstrap does not exhaust memory on Raspberry Pi
@@ -160,7 +160,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. State Infrastructure | 0/2 | Planned | - |
+| 1. State Infrastructure | 2/2 | Complete | 2026-02-22 |
 | 2. Vehicle Reliability | 0/3 | Not started | - |
 | 3. Data Foundation | 0/2 | Not started | - |
 | 4. Predictive Planner | 0/3 | Not started | - |

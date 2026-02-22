@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 1 of 8 (State Infrastructure)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-22 — Completed plan 01-01: StateStore + SSE live dashboard
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-22 — Completed plan 01-02: Config validation with fail-fast startup and error page
 
-Progress: [█░░░░░░░░░] 6%
+Progress: [██░░░░░░░░] 13%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 8 min
-- Total execution time: 0.1 hours
+- Total plans completed: 2
+- Average duration: 6 min
+- Total execution time: 0.2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| Phase 1 | 1 | 8 min | 8 min |
+| Phase 1 | 2 | 12 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 8 min
-- Trend: —
+- Last 5 plans: 8 min, 4 min
+- Trend: improving
 
 *Updated after each plan completion*
 
@@ -52,6 +52,10 @@ Recent decisions affecting current work:
 - [01-01]: SSE broadcast happens outside the RLock to avoid I/O while holding the state lock
 - [01-01]: ThreadedHTTPServer with daemon_threads=True enables concurrent SSE + API requests without blocking
 - [01-01]: Existing 60s polling preserved in app.js as fallback; SSE is an enhancement layer
+- [01-02]: WebServer started before EvccClient/InfluxDB construction so error page is reachable even on critical config errors
+- [01-02]: WebServer component attributes populated via late-binding after init rather than second server instance — avoids port conflict
+- [01-02]: ConfigValidator uses hasattr() on all field accesses for forward compatibility with future Config shape changes
+- [01-02]: Non-critical safe defaults applied before I/O objects are created so downstream components see corrected values
 
 ### Pending Todos
 
@@ -68,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 01-01-PLAN.md — StateStore + SSE implementation done
-Resume file: .planning/phases/01-state-infrastructure/01-02-PLAN.md
+Stopped at: Completed 01-02-PLAN.md — Config validation with fail-fast startup and error page
+Resume file: .planning/phases/02-soc-sequencer-fixes/ (Phase 2, Plan 1)
