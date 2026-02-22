@@ -44,6 +44,18 @@ configuration:
   battery_to_ev_floor_soc:
     name: Battery-to-EV Floor SoC (%)
     description: Minimum battery SoC when discharging to EV
+  battery_charge_power_kw:
+    name: Battery Charge Power (kW)
+    description: Maximum charging power of the home battery in kW
+  battery_min_soc:
+    name: Battery Min SoC (%)
+    description: Minimum battery state of charge — LP planner will not discharge below this
+  battery_max_soc:
+    name: Battery Max SoC (%)
+    description: Maximum battery state of charge — LP planner will not charge above this
+  feed_in_tariff_ct:
+    name: Feed-in Tariff (ct/kWh)
+    description: Revenue per kWh for feeding solar into the grid — used in LP objective
   ev_max_price_ct:
     name: EV Max Price (ct/kWh)
     description: Maximum electricity price for EV charging
@@ -53,6 +65,15 @@ configuration:
   ev_charge_deadline_hour:
     name: EV Charge Deadline (hour)
     description: Hour by which EV should be charged (0-23)
+  ev_default_energy_kwh:
+    name: EV Default Energy (kWh)
+    description: Fallback EV battery capacity when real capacity is unknown
+  sequencer_enabled:
+    name: Charge Sequencer Enabled
+    description: Enable multi-EV charge sequencing (one EV at a time on shared wallbox)
+  sequencer_default_charge_power_kw:
+    name: Sequencer Default Charge Power (kW)
+    description: Default charge power used by sequencer when vehicle-specific power is unavailable
   rl_enabled:
     name: RL Agent Enabled
     description: Enable Reinforcement Learning agent alongside LP optimizer
@@ -68,6 +89,9 @@ configuration:
   rl_ready_min_comparisons:
     name: RL Min Comparisons
     description: Minimum LP vs RL comparisons before RL activation
+  rl_bootstrap_max_records:
+    name: RL Bootstrap Max Records
+    description: Maximum InfluxDB records loaded during RL agent bootstrap to cap memory use
   vehicle_poll_interval_minutes:
     name: Vehicle Poll Interval (min)
     description: Interval for polling vehicle APIs for SoC updates

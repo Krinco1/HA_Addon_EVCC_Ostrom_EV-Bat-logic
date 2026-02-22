@@ -44,6 +44,18 @@ configuration:
   battery_to_ev_floor_soc:
     name: Batterie→EV Mindest-SoC (%)
     description: Minimaler Batterie-SoC bei Entladung ins EV
+  battery_charge_power_kw:
+    name: Batterie-Ladeleistung (kW)
+    description: Maximale Ladeleistung der Hausbatterie in kW
+  battery_min_soc:
+    name: Batterie Min-SoC (%)
+    description: Minimaler Batterie-Ladezustand — LP-Planer entlädt nicht darunter
+  battery_max_soc:
+    name: Batterie Max-SoC (%)
+    description: Maximaler Batterie-Ladezustand — LP-Planer lädt nicht darüber hinaus
+  feed_in_tariff_ct:
+    name: Einspeisevergütung (ct/kWh)
+    description: Vergütung je kWh für Solareinspeisung — wird im LP-Optimierungsziel verwendet
   ev_max_price_ct:
     name: EV Max-Preis (ct/kWh)
     description: Maximaler Strompreis für EV-Ladung
@@ -53,6 +65,15 @@ configuration:
   ev_charge_deadline_hour:
     name: EV Lade-Deadline (Stunde)
     description: Stunde bis zu der das EV geladen sein soll (0-23)
+  ev_default_energy_kwh:
+    name: EV Standard-Energie (kWh)
+    description: Fallback-Batteriekapazität des EV wenn echte Kapazität unbekannt
+  sequencer_enabled:
+    name: Charge Sequencer aktiviert
+    description: Mehrfach-EV-Ladesequenzierung aktivieren (ein EV gleichzeitig an gemeinsamer Wallbox)
+  sequencer_default_charge_power_kw:
+    name: Sequencer Standard-Ladeleistung (kW)
+    description: Standard-Ladeleistung des Sequencers wenn fahrzeugspezifische Leistung nicht verfügbar
   rl_enabled:
     name: RL-Agent aktiviert
     description: Reinforcement Learning Agent neben LP-Optimizer aktivieren
@@ -68,6 +89,9 @@ configuration:
   rl_ready_min_comparisons:
     name: RL Min. Vergleiche
     description: Minimale LP-vs-RL Vergleiche vor RL-Aktivierung
+  rl_bootstrap_max_records:
+    name: RL Bootstrap Max. Datensätze
+    description: Maximale InfluxDB-Datensätze beim RL-Bootstrap zur Speicherbegrenzung
   vehicle_poll_interval_minutes:
     name: Fahrzeug-Abfrageintervall (min)
     description: Intervall für Fahrzeug-API-Abfragen (SoC-Updates)
