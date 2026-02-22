@@ -196,6 +196,20 @@ class WebServer:
                     snap = srv._store.snapshot()
                     tariffs = srv.collector.evcc.get_tariff_grid()
                     self._json(srv._api_chart_data(tariffs, snap["solar_forecast"]))
+                elif path == "/forecast":
+                    snap = srv._store.snapshot()
+                    forecast_data = {
+                        "consumption_96": snap.get("consumption_forecast"),
+                        "pv_96": snap.get("pv_forecast"),
+                        "pv_confidence": snap.get("pv_confidence", 0.0),
+                        "pv_correction_label": snap.get("pv_correction_label", ""),
+                        "pv_quality_label": snap.get("pv_quality_label", ""),
+                        "forecaster_ready": snap.get("forecaster_ready", False),
+                        "forecaster_data_days": snap.get("forecaster_data_days", 0),
+                        "ha_warnings": snap.get("ha_warnings", []),
+                        "price_zones_96": srv._compute_price_zones(snap),
+                    }
+                    self._json(forecast_data)
                 # v5 endpoints
                 elif path == "/sequencer":
                     self._json(srv._api_sequencer())
@@ -550,6 +564,45 @@ class WebServer:
                     "message": f"Win-Rate {wr*100:.0f}% (Ziel: {th*100:.0f}%)", "color": "yellow"}
         return {"status": "⏳ Fast bereit", "percent": pct,
                 "message": f"Noch {mn - n} Vergleiche", "color": "lightgreen"}
+
+    def _compute_price_zones(self, snap: dict) -> list:
+        """Classify next 96 fifteen-minute slots as 'cheap', 'normal', or 'expensive'.
+
+        Uses price_percentiles from the last system state if available.
+        Returns a list of 96 strings. Falls back to 'normal' for all slots
+        when price data is not available.
+        """
+        state = snap.get("state")
+        if not state:
+            return ["normal"] * 96
+
+        p = getattr(state, "price_percentiles", {}) or {}
+        p30 = p.get(30)
+        p60 = p.get(60)
+        if p30 is None or p60 is None:
+            return ["normal"] * 96
+
+        # Fetch current tariff grid to classify slots
+        # We use price_percentiles thresholds against current price as a proxy
+        # since we don't have per-slot tariff data at 15-min resolution here.
+        # Classify the current price and extrapolate:
+        # - Below P30: cheap
+        # - Above P60: expensive
+        # - Between P30-P60: normal
+        # For a proper 96-slot version, the main loop would need to pass tariff slots.
+        # As a best-effort approximation, classify current price for all slots.
+        current_price = getattr(state, "current_price", None)
+        if current_price is None:
+            return ["normal"] * 96
+
+        if current_price <= p30:
+            zone = "cheap"
+        elif current_price >= p60:
+            zone = "expensive"
+        else:
+            zone = "normal"
+
+        return [zone] * 96
 
     def _api_strategy(self) -> dict:
         snap = self._store.snapshot()

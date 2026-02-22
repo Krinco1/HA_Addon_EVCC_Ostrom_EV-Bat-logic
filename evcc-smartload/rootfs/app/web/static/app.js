@@ -902,6 +902,189 @@ function escapeHtml(s) {
 }
 
 // =============================================================================
+// v7: Forecast chart — 24h SVG visualization
+// =============================================================================
+
+/**
+ * Render a 24h forecast chart as pure SVG into #forecastChart.
+ * Shows consumption (blue #00d4ff) and PV (yellow #ffdd00) lines,
+ * with price zone background colors and battery phase areas.
+ */
+function renderForecastChart(data) {
+    var container = $('forecastChart');
+    if (!container) return;
+
+    var consumption96 = data.consumption_96 || data.consumption_forecast || null;
+    var pv96 = data.pv_96 || data.pv_forecast || null;
+    var priceZones96 = data.price_zones_96 || null;
+    var batteryPhases96 = data.battery_phases_96 || null;
+
+    // If no data at all, show placeholder
+    if (!consumption96 && !pv96) {
+        container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:0.9em;">Prognose wird geladen...</div>';
+        return;
+    }
+
+    // --- Layout ---
+    var marginL = 50, marginR = 20, marginT = 20, marginB = 30;
+    var W = 960, H = 250;
+    var plotW = W - marginL - marginR;
+    var plotH = H - marginT - marginB;
+    var slots = 96;
+    var slotW = plotW / slots;
+
+    // --- Y-axis: scale to max of both datasets ---
+    var allVals = [];
+    if (consumption96) allVals = allVals.concat(consumption96);
+    if (pv96) {
+        // pv96 may be in kW — convert to W if values are small (< 20 means kW)
+        var pvMax = Math.max.apply(null, pv96.map(function(v) { return v || 0; }));
+        var pvUnit = pvMax > 20 ? 1.0 : 1000.0;  // scale kW to W
+        allVals = allVals.concat(pv96.map(function(v) { return (v || 0) * pvUnit; }));
+    }
+    var maxW = allVals.length > 0 ? Math.max.apply(null, allVals) : 3000;
+    maxW = Math.max(maxW, 500);
+    maxW = Math.ceil(maxW / 500) * 500;
+
+    function xPos(i) { return marginL + i * slotW + slotW * 0.5; }
+    function yPos(w) { return marginT + plotH - Math.min(1, Math.max(0, w / maxW)) * plotH; }
+
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block;">';
+
+    // --- 1. Price zone background rectangles ---
+    if (priceZones96) {
+        for (var zi = 0; zi < priceZones96.length && zi < slots; zi++) {
+            var zone = priceZones96[zi];
+            var zx = marginL + zi * slotW;
+            var zfill = '';
+            if (zone === 'cheap') zfill = 'rgba(0,255,136,0.08)';
+            else if (zone === 'expensive') zfill = 'rgba(255,68,68,0.06)';
+            if (zfill) {
+                s += '<rect x="' + zx.toFixed(1) + '" y="' + marginT + '" width="' + slotW.toFixed(1) + '" height="' + plotH + '" fill="' + zfill + '"/>';
+            }
+        }
+    }
+
+    // --- 2. Battery phase colored areas (placeholder for Phase 4) ---
+    if (batteryPhases96) {
+        for (var bi = 0; bi < batteryPhases96.length && bi < slots; bi++) {
+            var phase = batteryPhases96[bi];
+            var bx = marginL + bi * slotW;
+            var bfill = '';
+            if (phase === 'charge') bfill = 'rgba(0,255,136,0.15)';
+            else if (phase === 'discharge') bfill = 'rgba(255,170,0,0.15)';
+            if (bfill) {
+                s += '<rect x="' + bx.toFixed(1) + '" y="' + marginT + '" width="' + slotW.toFixed(1) + '" height="' + plotH + '" fill="' + bfill + '"/>';
+            }
+        }
+    }
+
+    // --- 3. Grid lines ---
+    var yStep = maxW <= 2000 ? 500 : (maxW <= 5000 ? 1000 : 2000);
+    for (var yv = 0; yv <= maxW; yv += yStep) {
+        var gy = yPos(yv);
+        s += '<line x1="' + marginL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - marginR) + '" y2="' + gy.toFixed(1) + '" stroke="#2a2a4a" stroke-width="0.8" stroke-dasharray="3,3"/>';
+        s += '<text x="' + (marginL - 4) + '" y="' + (gy + 3).toFixed(1) + '" fill="#555" font-size="9" text-anchor="end" font-family="sans-serif">' + (yv >= 1000 ? (yv/1000).toFixed(1)+'k' : yv) + '</text>';
+    }
+    s += '<text x="10" y="' + (marginT + plotH / 2) + '" fill="#555" font-size="8" text-anchor="middle" font-family="sans-serif" transform="rotate(-90,10,' + (marginT + plotH / 2) + ')">Watt</text>';
+
+    // --- 4. PV forecast area + line (yellow #ffdd00) ---
+    if (pv96) {
+        var pvPath = '';
+        var pvAreaPts = '';
+        var pvScale = pvMax > 20 ? 1.0 : 1000.0;
+        var firstPvX = xPos(0).toFixed(1);
+        var lastPvX = xPos(slots - 1).toFixed(1);
+        for (var pi = 0; pi < pv96.length && pi < slots; pi++) {
+            var pvy = yPos((pv96[pi] || 0) * pvScale);
+            var pvx = xPos(pi);
+            pvPath += (pi === 0 ? 'M' : 'L') + pvx.toFixed(1) + ',' + pvy.toFixed(1) + ' ';
+            pvAreaPts += (pi === 0 ? 'M' : 'L') + pvx.toFixed(1) + ',' + pvy.toFixed(1) + ' ';
+        }
+        var baseY = (marginT + plotH).toFixed(1);
+        s += '<path d="' + pvAreaPts + 'L' + lastPvX + ',' + baseY + ' L' + firstPvX + ',' + baseY + ' Z" fill="rgba(255,221,0,0.1)"/>';
+        s += '<path d="' + pvPath + '" fill="none" stroke="#ffdd00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    }
+
+    // --- 5. Consumption forecast line (blue #00d4ff) ---
+    if (consumption96) {
+        var cPath = '';
+        for (var ci = 0; ci < consumption96.length && ci < slots; ci++) {
+            var cy = yPos(consumption96[ci] || 0);
+            var cx = xPos(ci);
+            cPath += (ci === 0 ? 'M' : 'L') + cx.toFixed(1) + ',' + cy.toFixed(1) + ' ';
+        }
+        s += '<path d="' + cPath + '" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    }
+
+    // --- 6. X-axis time labels (every 3 hours = 12 slots) ---
+    var now = new Date();
+    var nowHour = now.getHours();
+    var nowMin = now.getMinutes();
+    var startSlot = Math.floor((nowHour * 60 + nowMin) / 15);  // current 15-min slot of day
+    for (var li = 0; li < slots; li += 12) {  // every 3 hours
+        var absoluteSlot = (startSlot + li) % 96;
+        var hour = Math.floor(absoluteSlot * 15 / 60);
+        var lx = xPos(li);
+        var ly = marginT + plotH + 14;
+        var label = (hour < 10 ? '0' : '') + hour + ':00';
+        s += '<text x="' + lx.toFixed(1) + '" y="' + ly + '" fill="#666" font-size="9" text-anchor="middle" font-family="sans-serif">' + label + '</text>';
+    }
+
+    // "Jetzt" marker at slot 0
+    var nowX = xPos(0);
+    s += '<line x1="' + nowX.toFixed(1) + '" y1="' + marginT + '" x2="' + nowX.toFixed(1) + '" y2="' + (marginT + plotH) + '" stroke="#00d4ff" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>';
+    s += '<text x="' + nowX.toFixed(1) + '" y="' + (marginT + plotH + 14) + '" fill="#00d4ff" font-size="8" text-anchor="middle" font-family="sans-serif">&#9650; jetzt</text>';
+
+    s += '</svg>';
+    container.innerHTML = s;
+}
+
+/**
+ * Update forecaster maturity indicator and PV labels below the forecast chart.
+ */
+function updateForecastMeta(data) {
+    var matEl = $('forecasterMaturity');
+    var qualEl = $('pvQualityLabel');
+    var corrEl = $('pvCorrectionLabel');
+
+    if (matEl) {
+        var days = data.forecaster_data_days || 0;
+        var ready = data.forecaster_ready || false;
+        if (ready) {
+            matEl.textContent = 'Verbrauchsprognose: ' + days + '/14 Tage Daten';
+            matEl.style.color = '#00ff88';
+        } else {
+            matEl.textContent = 'Verbrauchsprognose: ' + days + '/14 Tage Daten, Genauigkeit steigt noch';
+            matEl.style.color = '#888';
+        }
+    }
+
+    if (qualEl) {
+        qualEl.textContent = data.pv_quality_label || '';
+    }
+
+    if (corrEl) {
+        corrEl.textContent = data.pv_correction_label || '';
+    }
+}
+
+/**
+ * Show/hide the HA entity warning banner.
+ */
+function updateHaWarnings(warnings) {
+    var banner = $('haWarningBanner');
+    var text = $('haWarningText');
+    if (!banner || !text) return;
+    if (warnings && warnings.length > 0) {
+        text.textContent = warnings.join(' | ');
+        banner.style.display = 'flex';
+    } else {
+        banner.style.display = 'none';
+    }
+}
+
+// =============================================================================
 // v6: SSE — Live state push
 // =============================================================================
 
@@ -1001,6 +1184,13 @@ function applySSEUpdate(msg) {
 
     // Update age labels immediately after new data arrives
     updateAgeLabels();
+
+    // v7: Live forecast chart update via SSE
+    if (msg.forecast) {
+        renderForecastChart(msg.forecast);
+        updateForecastMeta(msg.forecast);
+        updateHaWarnings(msg.forecast.ha_warnings || []);
+    }
 }
 
 /**
@@ -1061,6 +1251,15 @@ function startSSE() {
 
 refresh();
 setInterval(refresh, 60000);
+
+// v7: Initial forecast chart load
+fetchJSON('/forecast').then(function(data) {
+    if (data) {
+        renderForecastChart(data);
+        updateForecastMeta(data);
+        updateHaWarnings(data.ha_warnings || []);
+    }
+});
 
 // v6: Start SSE for live updates between polls
 if (typeof EventSource !== 'undefined') {

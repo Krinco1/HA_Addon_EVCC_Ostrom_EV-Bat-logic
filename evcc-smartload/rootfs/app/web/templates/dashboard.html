@@ -176,12 +176,28 @@
 
         html, body { overflow-x: hidden; }
         img, table, pre { max-width: 100%; }
+
+        /* v7: Forecast chart styles */
+        .ha-warning-banner { background: #2e2200; border: 1px solid #ffaa00; border-left: 4px solid #ffaa00; color: #ffdd88; padding: 8px 16px; margin-bottom: 12px; border-radius: 6px; display: flex; align-items: flex-start; gap: 8px; font-size: 0.9em; }
+        .ha-warning-banner .warning-icon { font-size: 1.2em; flex-shrink: 0; }
+        .forecast-card { background: #16213e; border-radius: 10px; padding: 18px; margin-bottom: 15px; }
+        .forecast-chart-container { width: 100%; height: 250px; overflow: hidden; position: relative; }
+        .forecast-meta { display: flex; gap: 16px; font-size: 0.85em; color: #888; margin: 8px 0; flex-wrap: wrap; }
+        .forecast-maturity { font-style: italic; }
+        .forecast-quality { }
+        .forecast-correction { }
     </style>
 </head>
 <body>
 <div class="container">
+    <!-- v7: HA Entity Warning Banner (shown when unconfigured entities detected) -->
+    <div id="haWarningBanner" class="ha-warning-banner" style="display:none;">
+        <span class="warning-icon">&#9888;</span>
+        <span id="haWarningText"></span>
+    </div>
+
     <div class="header">
-        <h1>⚡ EVCC-Smartload</h1>
+        <h1>&#9889; EVCC-Smartload</h1>
         <span class="version">
             v{{version}} &bull; Hybrid LP + Shadow RL
             &bull; <span class="sse-dot" id="sseDot" title="Live-Verbindung"></span><span id="sseStatus" style="color:#555;font-size:0.85em;">Verbinde...</span>
@@ -220,6 +236,25 @@
     <div class="device-card" id="energyBalanceCard">
         <h3 style="margin-bottom: 12px;">⚡ Energiebilanz</h3>
         <div id="energyBalance" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;"></div>
+    </div>
+
+    <!-- v7: 24h Forecast Chart -->
+    <div class="forecast-card" id="forecastSection">
+        <h3 style="margin-bottom: 8px;">&#128202; 24h Prognose</h3>
+        <div class="forecast-meta">
+            <span id="forecasterMaturity" class="forecast-maturity"></span>
+            <span id="pvQualityLabel" class="forecast-quality"></span>
+            <span id="pvCorrectionLabel" class="forecast-correction"></span>
+        </div>
+        <div id="forecastChart" class="forecast-chart-container">
+            <!-- SVG chart rendered by app.js -->
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:0.8em;color:#888;flex-wrap:wrap;">
+            <span><span style="display:inline-block;width:12px;height:3px;background:#00d4ff;vertical-align:middle;margin-right:4px;"></span>Verbrauch</span>
+            <span><span style="display:inline-block;width:12px;height:3px;background:#ffdd00;vertical-align:middle;margin-right:4px;"></span>PV-Ertrag</span>
+            <span><span style="display:inline-block;width:12px;height:10px;background:rgba(0,255,136,0.15);vertical-align:middle;margin-right:4px;"></span>G&#252;nstige Stunden</span>
+            <span><span style="display:inline-block;width:12px;height:10px;background:rgba(255,68,68,0.12);vertical-align:middle;margin-right:4px;"></span>Teure Stunden</span>
+        </div>
     </div>
 
     <!-- Battery-to-EV optimization -->
@@ -264,7 +299,8 @@
         <a href="/docs" style="font-weight: bold;">📚 Dokumentation</a><br><br>
         API: <a href="/status">/status</a> | <a href="/slots">/slots</a> | <a href="/vehicles">/vehicles</a> |
         <a href="/rl-devices">/rl-devices</a> | <a href="/chart-data">/chart-data</a> | <a href="/strategy">/strategy</a> |
-        <a href="/decisions">/decisions</a> | <a href="/sequencer">/sequencer</a> | <a href="/drivers">/drivers</a>
+        <a href="/decisions">/decisions</a> | <a href="/sequencer">/sequencer</a> | <a href="/drivers">/drivers</a> |
+        <a href="/forecast">/forecast</a>
         <br>Auto-refresh alle 60 Sekunden
     </div>
 </div>
