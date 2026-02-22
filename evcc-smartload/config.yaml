@@ -1,7 +1,7 @@
 name: "EVCC-Smartload - Hybrid Optimizer"
 slug: evcc_smartload
-version: "5.0.7"
-description: "Hybrid LP+RL · Percentil-Thresholds · Charge-Sequencer · Telegram-Notifications · Quiet Hours · Batterie→EV"
+version: "6.0.0"
+description: "LP Horizon Planner · PV+Consumption Forecasting · Charge-Sequencer · RL Agent · Telegram · Quiet Hours · Batterie→EV"
 url: "https://github.com/Krinco1/HA_Addon_EVCC-Smartload"
 arch:
   - aarch64
@@ -34,14 +34,22 @@ options:
   battery_to_ev_min_profit_ct: 3.0
   battery_to_ev_dynamic_limit: true
   battery_to_ev_floor_soc: 20
+  battery_charge_power_kw: 4.3
+  battery_min_soc: 10
+  battery_max_soc: 90
+  feed_in_tariff_ct: 7.0
   ev_max_price_ct: 30.0
   ev_target_soc: 80
   ev_charge_deadline_hour: 6
+  ev_default_energy_kwh: 30.0
+  sequencer_enabled: true
+  sequencer_default_charge_power_kw: 11.0
   rl_enabled: true
   rl_auto_switch: true
   rl_ready_threshold: 0.8
   rl_fallback_threshold: 0.7
   rl_ready_min_comparisons: 200
+  rl_bootstrap_max_records: 1000
   vehicle_poll_interval_minutes: 60
   quiet_hours_enabled: true
   quiet_hours_start: 21
@@ -62,14 +70,22 @@ schema:
   battery_to_ev_min_profit_ct: "float(0,)"
   battery_to_ev_dynamic_limit: bool?
   battery_to_ev_floor_soc: "int(0,100)"
+  battery_charge_power_kw: "float(0,)"
+  battery_min_soc: "int(0,100)"
+  battery_max_soc: "int(0,100)"
+  feed_in_tariff_ct: "float(0,)"
   ev_max_price_ct: "float(0,)"
   ev_target_soc: "int(0,100)"
   ev_charge_deadline_hour: "int(0,23)"
+  ev_default_energy_kwh: "float(0,)"
+  sequencer_enabled: bool
+  sequencer_default_charge_power_kw: "float(0,)"
   rl_enabled: bool
   rl_auto_switch: bool
   rl_ready_threshold: "float(0,1)"
   rl_fallback_threshold: "float(0,1)"
   rl_ready_min_comparisons: "int(1,)"
+  rl_bootstrap_max_records: "int(1,)"
   vehicle_poll_interval_minutes: "int(1,)"
   quiet_hours_enabled: bool?
   quiet_hours_start: "int(0,23)"
