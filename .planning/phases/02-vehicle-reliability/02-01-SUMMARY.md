@@ -100,6 +100,16 @@ None - no external service configuration required.
 - RELI-05 (RL bootstrap progress logging + record cap) is the remaining Phase 2 requirement, addressed in plan 02
 - No blockers for downstream phases
 
+## Self-Check: PASSED
+
+- FOUND: evcc-smartload/rootfs/app/vehicle_monitor.py
+- FOUND: evcc-smartload/rootfs/app/main.py
+- FOUND: .planning/phases/02-vehicle-reliability/02-01-SUMMARY.md
+- FOUND commit: ddc290d (feat: connection-event detection in VehicleMonitor)
+- FOUND commit: 477121e (feat: sequencer SoC sync before plan())
+- FOUND commit: 35ea2fc (docs: plan metadata)
+- Key content verified: _prev_connected (3 occurrences in vehicle_monitor.py), sequencer.update_soc (1 in main.py)
+
 ---
 *Phase: 02-vehicle-reliability*
 *Completed: 2026-02-22*
