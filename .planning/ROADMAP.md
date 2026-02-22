@@ -110,10 +110,10 @@ Plans:
   1. `config.yaml` has an `image:` key pointing to a GHCR container path
   2. A GitHub Actions workflow builds multi-arch (amd64, aarch64, armv7) container images on push/tag
   3. Built images are pushed to GHCR and accessible to HA OS devices
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04.2-01-PLAN.md — Add image key to config.yaml, create GitHub Actions workflow for multi-arch build + push to GHCR
+- [ ] 04.2-01-PLAN.md — Add GHCR image key to config.yaml, GitHub Actions build+push workflow (home-assistant/builder@2025.09.0), post-push GHCR visibility checkpoint
 
 ### Phase 4.3: Release Documentation (INSERTED — Gap Closure)
 **Goal**: CHANGELOG.md and README.md accurately describe all Phases 1-4 features, APIs, and architecture
