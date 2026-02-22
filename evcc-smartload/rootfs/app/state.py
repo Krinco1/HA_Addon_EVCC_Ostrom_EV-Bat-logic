@@ -4,6 +4,8 @@ Shared data structures for system state, actions, and vehicle status.
 v5.0: SystemState extended with price percentiles and solar forecast bucket.
       to_vector() now returns 31 features (was 25).
       Action extended: battery 7 actions, EV 5 actions.
+v5.0.2: Fixed ManualSocStore.get() returning dict instead of float.
+        Added SSL support for InfluxDB.
 """
 
 import json
@@ -57,14 +59,14 @@ class SystemState:
     # v5: Price percentiles from 24h tariff window
     # e.g. {20: 0.12, 30: 0.15, 40: 0.18, 60: 0.25, 80: 0.32}
     price_percentiles: Dict[int, float] = field(default_factory=dict)
-    price_spread: float = 0.0           # P80 - P20 (market volatility)
-    hours_cheap_remaining: int = 0      # hours below P30 remaining today
+    price_spread: float = 0.0       # P80 - P20 (market volatility)
+    hours_cheap_remaining: int = 0   # hours below P30 remaining today
     solar_forecast_total_kwh: float = 0.0
 
     def to_vector(self) -> np.ndarray:
         """Normalised feature vector for the RL agent (31-d).
 
-        Indices 0-24: identical to v4 (backward-compatible layout kept for
+        Indices  0-24: identical to v4 (backward-compatible layout kept for
                        reference; Q-table is reset anyway due to new actions).
         Indices 25-30: six new forecast context features.
         """
@@ -72,44 +74,44 @@ class SystemState:
         weekday = self.timestamp.weekday()
 
         features = [
-            self.battery_soc / 100,                             # 0
-            np.clip(self.battery_power / 5000, -1, 1),          # 1
-            np.clip(self.grid_power / 10000, -1, 1),            # 2
-            self.current_price / 0.5,                           # 3
-            np.clip(self.pv_power / 10000, 0, 1),               # 4
-            np.clip(self.home_power / 5000, 0, 1),              # 5
-            float(self.ev_connected),                           # 6
-            self.ev_soc / 100 if self.ev_connected else 0,      # 7
-            np.clip(self.ev_power / 11000, 0, 1),               # 8
-            np.sin(2 * np.pi * hour / 24),                      # 9
-            np.cos(2 * np.pi * hour / 24),                      # 10
-            np.sin(2 * np.pi * weekday / 7),                    # 11
-            np.cos(2 * np.pi * weekday / 7),                    # 12
+            self.battery_soc / 100,                        # 0
+            np.clip(self.battery_power / 5000, -1, 1),     # 1
+            np.clip(self.grid_power / 10000, -1, 1),       # 2
+            self.current_price / 0.5,                       # 3
+            np.clip(self.pv_power / 10000, 0, 1),           # 4
+            np.clip(self.home_power / 5000, 0, 1),          # 5
+            float(self.ev_connected),                       # 6
+            self.ev_soc / 100 if self.ev_connected else 0,  # 7
+            np.clip(self.ev_power / 11000, 0, 1),           # 8
+            np.sin(2 * np.pi * hour / 24),                  # 9
+            np.cos(2 * np.pi * hour / 24),                  # 10
+            np.sin(2 * np.pi * weekday / 7),                # 11
+            np.cos(2 * np.pi * weekday / 7),                # 12
         ]
 
         prices = (self.price_forecast[:6] + [0] * 6)[:6]
-        features.extend([p / 0.5 for p in prices])             # 13-18
+        features.extend([p / 0.5 for p in prices])          # 13-18
 
         pv = (self.pv_forecast[:6] + [0] * 6)[:6]
-        features.extend([p / 10000 for p in pv])               # 19-24
+        features.extend([p / 10000 for p in pv])             # 19-24
 
         # --- v5: 6 new forecast-context features ---
         p20 = self.price_percentiles.get(20, self.current_price)
         p60 = self.price_percentiles.get(60, self.current_price)
         features += [
-            float(np.clip(p20 / 0.5, 0, 1)),                                    # 25 P20 normalised
-            float(np.clip(p60 / 0.5, 0, 1)),                                    # 26 P60 normalised
-            float(np.clip(self.price_spread / 0.3, 0, 1)),                      # 27 spread normalised
-            float(min(self.hours_cheap_remaining / 12, 1.0)),                   # 28 cheap hours remaining
-            float(min(self.solar_forecast_total_kwh / 30, 1.0)),               # 29 solar forecast
-            float(self.timestamp.timetuple().tm_yday / 365),                   # 30 season (0=Jan, ~0.5=Jul)
+            float(np.clip(p20 / 0.5, 0, 1)),                 # 25  P20 normalised
+            float(np.clip(p60 / 0.5, 0, 1)),                 # 26  P60 normalised
+            float(np.clip(self.price_spread / 0.3, 0, 1)),   # 27  spread normalised
+            float(min(self.hours_cheap_remaining / 12, 1.0)), # 28  cheap hours remaining
+            float(min(self.solar_forecast_total_kwh / 30, 1.0)),  # 29  solar forecast
+            float(self.timestamp.timetuple().tm_yday / 365),  # 30  season (0=Jan, ~0.5=Jul)
         ]
 
         return np.array(features, dtype=np.float32)
 
 
 # =============================================================================
-# Action (output of optimizer / RL agent)  — v5 extended action space
+# Action (output of optimizer / RL agent) — v5 extended action space
 # =============================================================================
 
 @dataclass
@@ -118,7 +120,7 @@ class Action:
 
     Battery actions (7):
         0 = hold
-        1 = charge_p20  (charge only when price ≤ P20 of 24h window)
+        1 = charge_p20  (charge only when price <= P20 of 24h window)
         2 = charge_p40
         3 = charge_p60
         4 = charge_max  (charge up to config battery_max_price_ct)
@@ -127,15 +129,13 @@ class Action:
 
     EV actions (5):
         0 = no_charge
-        1 = charge_p30  (charge only when price ≤ P30)
+        1 = charge_p30  (charge only when price <= P30)
         2 = charge_p60
         3 = charge_max  (charge up to config ev_max_price_ct)
         4 = charge_pv   (PV-only)
     """
-
     battery_action: int
     ev_action: int
-
     battery_limit_eur: Optional[float] = None
     ev_limit_eur: Optional[float] = None
 
@@ -147,7 +147,6 @@ class Action:
 @dataclass
 class VehicleStatus:
     """Status of a single vehicle, whether connected to wallbox or not."""
-
     name: str
     soc: float
     capacity_kwh: float
@@ -158,16 +157,25 @@ class VehicleStatus:
     data_source: str = "evcc"
     provider_type: str = "evcc"
     last_poll: Optional[datetime] = None
-
     manual_soc: Optional[float] = None
     manual_soc_timestamp: Optional[datetime] = None
 
     def get_effective_soc(self) -> float:
-        if self.manual_soc is not None and self.manual_soc_timestamp:
-            if self.soc == 0:
-                return self.manual_soc
-            if not self.last_update or self.manual_soc_timestamp > self.last_update:
-                return self.manual_soc
+        # v5.0.2: Defensive check — ensure manual_soc is a number
+        manual = self.manual_soc
+        if manual is not None:
+            if isinstance(manual, dict):
+                manual = manual.get("soc")
+            if manual is not None and self.manual_soc_timestamp:
+                try:
+                    manual = float(manual)
+                except (TypeError, ValueError):
+                    manual = None
+                if manual is not None:
+                    if self.soc == 0:
+                        return manual
+                    if not self.last_update or self.manual_soc_timestamp > self.last_update:
+                        return manual
         return self.soc
 
     def get_poll_age_string(self) -> str:
@@ -231,11 +239,47 @@ class ManualSocStore:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             self._save()
-            log("info", f"✏️ Manual SoC for {vehicle_name} set to {soc}%")
+            log("info", f"Manual SoC for {vehicle_name} set to {soc}%")
 
-    def get(self, vehicle_name: str) -> Optional[Dict]:
+    def get(self, vehicle_name: str) -> Optional[float]:
+        """Return the manual SoC value as a float, or None.
+
+        v5.0.2 fix: Previously returned the raw dict {"soc": ..., "timestamp": ...}
+        which caused TypeErrors throughout the application.
+        """
         with self._lock:
-            return self._data.get(vehicle_name)
+            entry = self._data.get(vehicle_name)
+            if entry is None:
+                return None
+            if isinstance(entry, dict):
+                soc_val = entry.get("soc")
+                if soc_val is not None:
+                    try:
+                        return float(soc_val)
+                    except (TypeError, ValueError):
+                        return None
+                return None
+            # Legacy fallback: direct float storage
+            try:
+                return float(entry)
+            except (TypeError, ValueError):
+                return None
+
+    def get_timestamp(self, vehicle_name: str) -> Optional[datetime]:
+        """Return the timestamp when manual SoC was set."""
+        with self._lock:
+            entry = self._data.get(vehicle_name)
+            if entry is None or not isinstance(entry, dict):
+                return None
+            ts_str = entry.get("timestamp")
+            if not ts_str:
+                return None
+            try:
+                if ts_str.endswith("Z"):
+                    return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                return datetime.fromisoformat(ts_str)
+            except (ValueError, TypeError):
+                return None
 
     def get_all(self) -> Dict:
         with self._lock:
@@ -273,7 +317,8 @@ def compute_price_percentiles(tariffs: List[Dict]) -> Dict[int, float]:
 # Solar surplus helpers
 # =============================================================================
 
-def calc_solar_surplus_kwh(solar_forecast: List[Dict], home_consumption_kw: float = 1.0) -> float:
+def calc_solar_surplus_kwh(solar_forecast: List[Dict],
+                           home_consumption_kw: float = 1.0) -> float:
     """Calculate expected solar surplus energy in kWh from evcc forecast entries."""
     if not solar_forecast or len(solar_forecast) < 2:
         return 0.0

@@ -1,6 +1,6 @@
 name: "EVCC-Smartload - Hybrid Optimizer"
 slug: evcc_smartload
-version: "5.0.1"
+version: "5.0.2"
 description: "Hybrid LP+RL · Percentil-Thresholds · Charge-Sequencer · Telegram-Notifications · Quiet Hours · Batterie→EV"
 url: "https://github.com/Krinco1/HA_Addon_EVCC-Smartload"
 arch:
@@ -10,6 +10,7 @@ arch:
 init: false
 startup: application
 boot: auto
+webui: "http://[HOST]:[PORT:8099]"
 map:
   - type: addon_config
     read_only: false
@@ -25,6 +26,7 @@ options:
   influxdb_database: "smartload"
   influxdb_username: "smartload"
   influxdb_password: "smartload"
+  influxdb_ssl: false
   battery_capacity_kwh: 33.1
   battery_max_price_ct: 25.0
   battery_charge_efficiency: 0.92
@@ -45,29 +47,30 @@ options:
   quiet_hours_start: 21
   quiet_hours_end: 6
 schema:
-  evcc_url: str
+  evcc_url: url
   evcc_password: password?
   influxdb_host: str
-  influxdb_port: int
+  influxdb_port: port
   influxdb_database: str
   influxdb_username: str
   influxdb_password: password
-  battery_capacity_kwh: float
-  battery_max_price_ct: float
-  battery_charge_efficiency: float?
-  battery_discharge_efficiency: float?
-  battery_to_ev_min_profit_ct: float?
+  influxdb_ssl: bool?
+  battery_capacity_kwh: "float(0,)"
+  battery_max_price_ct: "float(0,)"
+  battery_charge_efficiency: "float(0,1)"
+  battery_discharge_efficiency: "float(0,1)"
+  battery_to_ev_min_profit_ct: "float(0,)"
   battery_to_ev_dynamic_limit: bool?
-  battery_to_ev_floor_soc: int?
-  ev_max_price_ct: float
-  ev_target_soc: int
-  ev_charge_deadline_hour: int
+  battery_to_ev_floor_soc: "int(0,100)"
+  ev_max_price_ct: "float(0,)"
+  ev_target_soc: "int(0,100)"
+  ev_charge_deadline_hour: "int(0,23)"
   rl_enabled: bool
   rl_auto_switch: bool
-  rl_ready_threshold: float
-  rl_fallback_threshold: float
-  rl_ready_min_comparisons: int
-  vehicle_poll_interval_minutes: int
+  rl_ready_threshold: "float(0,1)"
+  rl_fallback_threshold: "float(0,1)"
+  rl_ready_min_comparisons: "int(1,)"
+  vehicle_poll_interval_minutes: "int(1,)"
   quiet_hours_enabled: bool?
-  quiet_hours_start: int?
-  quiet_hours_end: int?
+  quiet_hours_start: "int(0,23)"
+  quiet_hours_end: "int(0,23)"

@@ -1,6 +1,47 @@
-# Changelog
+# EVCC-Smartload Changelog
 
-## [5.0.1] – 2026-02-20
+---
+
+## v5.0.2 — Bugfixes: ManualSocStore · InfluxDB SSL
+
+### Bugfixes
+
+**ManualSocStore.get() gab dict statt float zurück**
+- `set()` speichert `{"soc": 80, "timestamp": "..."}`, aber `get()` gab das gesamte dict zurück
+- Verursachte `TypeError: '>' not supported between instances of 'dict' and 'int'` in:
+  - `vehicle_monitor.py:102` (predict_charge_need)
+  - `comparator.py:194` (EV-SoC Vergleiche)
+  - `web/server.py` (API-Responses)
+  - `main.py:276` (Hauptschleife)
+- Fix: `get()` extrahiert jetzt den `soc`-Wert als float
+- Zusätzlich: `get_timestamp()` Methode für sauberen Timestamp-Zugriff
+- Defensive Absicherung in `get_effective_soc()` gegen dict-Typ
+
+**InfluxDB SSL-Support**
+- InfluxDB-Client war hardcoded auf `http://` — bei aktiviertem SSL im InfluxDB-Addon kam HTTP 401
+- Neue Config-Option `influxdb_ssl: true/false` (Default: false)
+- SSL-Kontext akzeptiert selbstsignierte Zertifikate (lokales Netzwerk)
+- Protokoll-Erkennung beim Start geloggt
+
+### Geänderte Dateien
+- `rootfs/app/state.py` — ManualSocStore.get() + get_timestamp() + defensive get_effective_soc()
+- `rootfs/app/influxdb_client.py` — SSL-Support mit konfigurierbarem Protokoll
+- `rootfs/app/config.py` — neues Feld `influxdb_ssl: bool`
+- `config.yaml` — Option `influxdb_ssl` + Schema-Eintrag
+- `rootfs/app/version.py` — 5.0.2
+
+### Neue Konfigurationsfelder
+```yaml
+influxdb_ssl: true   # Default: false — auf true setzen wenn InfluxDB SSL aktiviert hat
+```
+
+### Rückwärtskompatibilität
+- `influxdb_ssl` Default ist `false` → bestehende HTTP-Setups unverändert
+- ManualSocStore-Fix ist transparent — bestehende JSON-Daten werden korrekt gelesen
+
+---
+
+## v5.0.1 — Bugfixes: Module · SystemState · InfluxDB · DriverManager
 
 ### Fixed
 - **`No module named 'yaml'`** — `pyyaml` zu pip-Dependencies im Dockerfile hinzugefügt
@@ -8,54 +49,69 @@
 - **`InfluxDBClient has no attribute 'get_history_hours'`** — Methode `get_history_hours()` in `influxdb_client.py` implementiert
 - **`DriverManager.to_api_list()`** — Methode fehlte, wird von `web/server.py` unter `/drivers` aufgerufen
 
-## [5.0.0] – 2026-02-20
+---
 
-### Neu
-- **Percentil-Thresholds** statt statischer ct-Grenzen (P20/P30/P40/P60/P80)
-- **RL State Space**: 25 → 31 Features (Percentile, Spread, günstige Stunden, Solar-Prognose, Saison)
-- **RL Action Space**: 16 → 35 Aktionen (7 Batterie × 5 EV-Modi)
-- **Charge Sequencer** (`charge_sequencer.py`): Koordinierte Lade-Reihenfolge für mehrere EVs
-- **Quiet Hours** (Standard: 21:00–06:00): Kein EV-Wechsel während der Nacht
-- **Telegram Notifications** (`notification.py`): Direkte Bot-API, kein HA-Umweg
-- **Driver Manager** (`driver_manager.py`): Fahrer-EV-Zuordnung via `drivers.yaml`
-- **Neue API-Endpunkte**: `/sequencer`, `/drivers`, `/sequencer/request`, `/sequencer/cancel`
-- **Dashboard**: P30-Linie im Preischart, Lade-Zeitplan-Panel, Sequencer-Status
+## v5.0.0 — Percentil-Optimierung · Charge-Sequencer · Telegram
 
-### Geändert
-- `battery_power` und `grid_power` fehlen nicht mehr optional in SystemState
-- LP Optimizer auf Percentil-basierte Thresholds umgestellt
-- RL Q-Table wird zurückgesetzt (State Space inkompatibel mit v4) — RL lernt in ~2 Tagen vom LP nach
+### Neue Features
 
-### Neue Konfigurationsfelder (alle optional, Defaults = bisheriges Verhalten)
+**Percentil-basierte Preis-Thresholds (LP + RL)**
+- Batterie und EVs laden nicht mehr gegen statische ct-Schwellen, sondern gegen dynamische Marktperzentile
+- LP-Optimizer berechnet P20/P40/P60/P80 aus den nächsten 24h und wählt Aggressivität je nach Solar-Prognose, SoC und Saison
+- RL-Agent bekommt 6 neue State-Features: P20, P60, Spread, günstige Stunden, Solar-Forecast, Saisonindex
+- State Space: 25 → 31 Features · Action Space: 7×5 = 35 Aktionen (war 4×4 = 16)
+- P30-Linie im Dashboard-Chart (cyan gestrichelt) zeigt günstigstes 30%-Fenster
+
+**Charge-Sequencer (EV-Lade-Koordination)**
+- Plant optimale Lade-Reihenfolge für mehrere EVs an einer Wallbox
+- Quiet Hours: Kein EV-Wechsel zwischen 21:00–06:00 (konfigurierbar)
+- Pre-Quiet-Hour-Empfehlung: 90 Minuten vorher wird empfohlen, welches EV angesteckt werden soll
+- Dashboard zeigt Lade-Zeitplan mit Stunden, kWh, Preisen und Quelle (Solar/Günstig/Normal)
+- Neuer API-Endpoint: `GET /sequencer`, `POST /sequencer/request`, `POST /sequencer/cancel`
+
+**Telegram-Notifications (direkt, kein HA-Umweg)**
+- Smartload → Telegram Bot API → Fahrer (kein HA Webhook/Automation nötig)
+- Long-Polling Thread für Antworten (Inline-Keyboard: 80% / 100% / Nein)
+- Fahrer bestätigt Ziel-SoC per Button → Sequencer plant automatisch
+- Konfiguration über neue `drivers.yaml` (analog zu `vehicles.yaml`)
+- Notification bei: Preisfenster öffnet, Ladung fertig, Umsteck-Empfehlung
+
+**Driver Manager (drivers.yaml)**
+- Neue optionale Konfigurationsdatei `/config/drivers.yaml`
+- Fahrer ↔ Fahrzeug-Zuordnung + Telegram Chat-IDs
+- Beim ersten Start wird `drivers.yaml.example` angelegt
+- Neuer API-Endpoint: `GET /drivers`
+
+### Geänderte Konfigurationsfelder
+Neue optionale Felder in `config.yaml` (Defaults = Bestandsverhalten):
 ```yaml
-quiet_hours_enabled: true   # Kein EV-Wechsel 21:00–06:00
-quiet_hours_start: 21
-quiet_hours_end: 6
-sequencer_enabled: true     # Koordiniertes EV-Laden
-```
-
-### Neue Datei: `/config/drivers.yaml`
-```yaml
-telegram_bot_token: ""
-drivers:
-  - name: "Nico"
-    vehicles: ["KIA_EV9"]
-    telegram_chat_id: 123456789
+quiet_hours_enabled: true   # Standard: true
+quiet_hours_start: 21       # Ab wann kein EV-Wechsel
+quiet_hours_end: 6          # Bis wann kein EV-Wechsel
 ```
 
 ### Rückwärtskompatibilität
-- `vehicles.yaml` Format unverändert
-- Alle bestehenden `config.yaml` Felder bleiben
-- Ohne `drivers.yaml` läuft alles wie in v4 (keine Notifications, statische EV-Limits)
-- RL-Daten (Comparisons) bleiben erhalten; nur Q-Table wird zurückgesetzt
+- Alle bestehenden `config.yaml`-Felder bleiben unverändert
+- `vehicles.yaml` Format bleibt identisch
+- `drivers.yaml` ist optional — ohne Datei läuft alles wie bisher
+- Ohne Telegram-Token: keine Notifications, EV mit statischen Limits (wie v4)
+- RL Q-Table Reset notwendig (State Space ändert sich) — RL lernt in ~2 Tagen vom LP neu
 
 ---
 
-## [4.3.11] – 2026-02-18
-Dashboard-Redesign, Decision-Log, SVG-Chart, Wallbox-Erkennung, W/kW-Ladeplanung
+## v4.3.11 — SVG-Chart Redesign · Dashboard-Verbesserungen
+- SVG-Preischart vollständig neu (Y-Achse, Gitter, Solar-Fläche, Tooltip)
+- Batterie-Entladetiefe mit dynamischem bufferSoc via evcc API
+- Energiebilanz mit Echtzeit-Werten (PV, Haus, Netz, Batterie)
+- Decision-Log mit Kategorien (observe, plan, action, warning, rl)
 
-## [4.3.9] – 2026-02-15
-PV-Ladeplanung, Energiebilanz, KIA-Fix, Solar-Surplus-Berechnung
+## v4.3.x — Batterie→EV Entladung · Dynamic Discharge
+- evcc bufferSoc/prioritySoc/bufferStartSoc dynamisch berechnet
+- Solar-Prognose-Integration für Entladetiefenberechnung
+- Case-insensitive Fahrzeug-Matching korrigiert
+- RL Pro-Device Control (Batterie + EVs einzeln steuerbar)
 
-## [4.3.7] – 2026-02-12
-Batterie-Entladung für EV, bufferSoc/prioritySoc API, Dashboard-Farbzonen
+## v4.0.0 — Hybrid LP+RL
+- Dualer Optimierungsansatz: Linear Programming + Reinforcement Learning
+- Comparator: automatischer LP↔RL Switch nach Leistungsmetriken
+- Neue Dashboard-Panels: RL-Reife, Vergleiche, Entscheidungs-Log

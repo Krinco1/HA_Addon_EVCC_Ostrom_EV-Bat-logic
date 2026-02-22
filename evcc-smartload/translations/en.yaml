@@ -1,0 +1,82 @@
+configuration:
+  evcc_url:
+    name: evcc URL
+    description: URL of the evcc server (e.g. http://192.168.1.66:7070)
+  evcc_password:
+    name: evcc Password
+    description: Password for evcc API access (leave empty if not set)
+  influxdb_host:
+    name: InfluxDB Host
+    description: Hostname or IP of the InfluxDB server
+  influxdb_port:
+    name: InfluxDB Port
+    description: Port of the InfluxDB server
+  influxdb_database:
+    name: InfluxDB Database
+    description: Name of the InfluxDB database for metrics
+  influxdb_username:
+    name: InfluxDB Username
+    description: Username for InfluxDB authentication
+  influxdb_password:
+    name: InfluxDB Password
+    description: Password for InfluxDB authentication
+  influxdb_ssl:
+    name: InfluxDB SSL
+    description: Use HTTPS for InfluxDB connection (for self-signed certs)
+  battery_capacity_kwh:
+    name: Battery Capacity (kWh)
+    description: Total usable capacity of the home battery in kWh
+  battery_max_price_ct:
+    name: Battery Max Price (ct/kWh)
+    description: Maximum electricity price for battery charging
+  battery_charge_efficiency:
+    name: Battery Charge Efficiency
+    description: Charging efficiency factor (0.0 - 1.0)
+  battery_discharge_efficiency:
+    name: Battery Discharge Efficiency
+    description: Discharging efficiency factor (0.0 - 1.0)
+  battery_to_ev_min_profit_ct:
+    name: Battery-to-EV Min Profit (ct)
+    description: Minimum price difference to discharge battery into EV
+  battery_to_ev_dynamic_limit:
+    name: Dynamic Battery-to-EV Limit
+    description: Dynamically calculate discharge depth based on forecasts
+  battery_to_ev_floor_soc:
+    name: Battery-to-EV Floor SoC (%)
+    description: Minimum battery SoC when discharging to EV
+  ev_max_price_ct:
+    name: EV Max Price (ct/kWh)
+    description: Maximum electricity price for EV charging
+  ev_target_soc:
+    name: EV Target SoC (%)
+    description: Default target state of charge for EV
+  ev_charge_deadline_hour:
+    name: EV Charge Deadline (hour)
+    description: Hour by which EV should be charged (0-23)
+  rl_enabled:
+    name: RL Agent Enabled
+    description: Enable Reinforcement Learning agent alongside LP optimizer
+  rl_auto_switch:
+    name: RL Auto Switch
+    description: Automatically switch from LP to RL when ready
+  rl_ready_threshold:
+    name: RL Ready Threshold
+    description: Win-rate threshold for RL to take over (0.0 - 1.0)
+  rl_fallback_threshold:
+    name: RL Fallback Threshold
+    description: Win-rate below which RL falls back to LP (0.0 - 1.0)
+  rl_ready_min_comparisons:
+    name: RL Min Comparisons
+    description: Minimum LP vs RL comparisons before RL activation
+  vehicle_poll_interval_minutes:
+    name: Vehicle Poll Interval (min)
+    description: Interval for polling vehicle APIs for SoC updates
+  quiet_hours_enabled:
+    name: Quiet Hours Enabled
+    description: Prevent EV switching during night hours
+  quiet_hours_start:
+    name: Quiet Hours Start (hour)
+    description: Hour when quiet hours begin (no EV switching)
+  quiet_hours_end:
+    name: Quiet Hours End (hour)
+    description: Hour when quiet hours end

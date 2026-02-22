@@ -1,0 +1,82 @@
+configuration:
+  evcc_url:
+    name: evcc URL
+    description: URL des evcc-Servers (z.B. http://192.168.1.66:7070)
+  evcc_password:
+    name: evcc Passwort
+    description: Passwort für evcc API-Zugriff (leer lassen wenn nicht gesetzt)
+  influxdb_host:
+    name: InfluxDB Host
+    description: Hostname oder IP des InfluxDB-Servers
+  influxdb_port:
+    name: InfluxDB Port
+    description: Port des InfluxDB-Servers
+  influxdb_database:
+    name: InfluxDB Datenbank
+    description: Name der InfluxDB-Datenbank für Metriken
+  influxdb_username:
+    name: InfluxDB Benutzername
+    description: Benutzername für InfluxDB-Authentifizierung
+  influxdb_password:
+    name: InfluxDB Passwort
+    description: Passwort für InfluxDB-Authentifizierung
+  influxdb_ssl:
+    name: InfluxDB SSL
+    description: HTTPS für InfluxDB-Verbindung verwenden (auch selbstsignierte Zertifikate)
+  battery_capacity_kwh:
+    name: Batterie-Kapazität (kWh)
+    description: Nutzbare Gesamtkapazität der Hausbatterie in kWh
+  battery_max_price_ct:
+    name: Batterie Max-Preis (ct/kWh)
+    description: Maximaler Strompreis für Batterieladung
+  battery_charge_efficiency:
+    name: Lade-Effizienz Batterie
+    description: Ladeffizienz-Faktor (0.0 - 1.0)
+  battery_discharge_efficiency:
+    name: Entlade-Effizienz Batterie
+    description: Entladeeffizienz-Faktor (0.0 - 1.0)
+  battery_to_ev_min_profit_ct:
+    name: Batterie→EV Min-Profit (ct)
+    description: Mindest-Preisdifferenz für Batterie-Entladung ins EV
+  battery_to_ev_dynamic_limit:
+    name: Dynamisches Batterie→EV Limit
+    description: Entladetiefe dynamisch anhand von Prognosen berechnen
+  battery_to_ev_floor_soc:
+    name: Batterie→EV Mindest-SoC (%)
+    description: Minimaler Batterie-SoC bei Entladung ins EV
+  ev_max_price_ct:
+    name: EV Max-Preis (ct/kWh)
+    description: Maximaler Strompreis für EV-Ladung
+  ev_target_soc:
+    name: EV Ziel-SoC (%)
+    description: Standard-Zielladezustand für EV
+  ev_charge_deadline_hour:
+    name: EV Lade-Deadline (Stunde)
+    description: Stunde bis zu der das EV geladen sein soll (0-23)
+  rl_enabled:
+    name: RL-Agent aktiviert
+    description: Reinforcement Learning Agent neben LP-Optimizer aktivieren
+  rl_auto_switch:
+    name: RL Auto-Umschaltung
+    description: Automatisch von LP zu RL wechseln wenn bereit
+  rl_ready_threshold:
+    name: RL Bereitschafts-Schwelle
+    description: Win-Rate-Schwelle für RL-Übernahme (0.0 - 1.0)
+  rl_fallback_threshold:
+    name: RL Rückfall-Schwelle
+    description: Win-Rate unter der RL zu LP zurückfällt (0.0 - 1.0)
+  rl_ready_min_comparisons:
+    name: RL Min. Vergleiche
+    description: Minimale LP-vs-RL Vergleiche vor RL-Aktivierung
+  vehicle_poll_interval_minutes:
+    name: Fahrzeug-Abfrageintervall (min)
+    description: Intervall für Fahrzeug-API-Abfragen (SoC-Updates)
+  quiet_hours_enabled:
+    name: Quiet Hours aktiviert
+    description: Kein EV-Wechsel während der Nachtstunden
+  quiet_hours_start:
+    name: Quiet Hours Start (Stunde)
+    description: Beginn der Quiet Hours (kein EV-Wechsel)
+  quiet_hours_end:
+    name: Quiet Hours Ende (Stunde)
+    description: Ende der Quiet Hours
