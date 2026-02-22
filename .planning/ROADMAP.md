@@ -97,10 +97,10 @@ Plans:
   1. `version.py` and `config.yaml` both declare version `6.0.0`
   2. All LP planner config fields (battery_charge_power_kw, battery_min/max_soc, feed_in_tariff_ct, ev_default_energy_kwh, sequencer_enabled, sequencer_default_charge_power_kw, rl_bootstrap_max_records) are exposed in config.yaml options and schema sections
   3. `repository.yaml` includes `channel: stable`
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04.1-01-PLAN.md — Version bump, config schema completion, repository.yaml update
+- [ ] 04.1-01-PLAN.md — Version bump to 6.0.0, config.yaml schema completion (8 LP planner fields), repository.yaml channel, translations
 
 ### Phase 4.2: CI/CD Pipeline (INSERTED — Gap Closure)
 **Goal**: HA OS devices can install the add-on from a pre-built container image pulled from GHCR
