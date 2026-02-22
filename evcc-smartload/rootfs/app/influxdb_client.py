@@ -102,6 +102,87 @@ class InfluxDBClient:
 
         self.write("Smartprice", fields)
 
+    def query_home_power_15min(self, days: int = 7) -> list:
+        """Return home_power at 15-min resolution for the last N days.
+
+        Used by ConsumptionForecaster for tier 1 (recent) bootstrap data.
+
+        Args:
+            days: Number of days of history to fetch (default: 7)
+
+        Returns:
+            List of {"time": str, "watts": float} dicts, empty list on error.
+        """
+        if not self._enabled:
+            return []
+        try:
+            query = (
+                f"SELECT mean(home_power) "
+                f"FROM Smartprice "
+                f"WHERE time > now() - {days}d "
+                f"GROUP BY time(15m) fill(none)"
+            )
+            resp = requests.get(
+                f"{self._base_url}/query",
+                params={"db": self.database, "q": query},
+                auth=self._auth,
+                verify=self._verify,
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            results = []
+            for series in data.get("results", [{}])[0].get("series", []):
+                for row in series.get("values", []):
+                    if row[1] is not None:
+                        results.append({"time": row[0], "watts": float(row[1])})
+            return results
+        except Exception as e:
+            log("warning", f"InfluxDB query_home_power_15min error: {e}")
+            return []
+
+    def query_home_power_hourly(self, days_start: int = 8, days_end: int = 30) -> list:
+        """Return home_power at hourly resolution for a time window.
+
+        Used by ConsumptionForecaster for tier 2 (medium) bootstrap data.
+        Queries the window between days_start and days_end ago.
+
+        Args:
+            days_start: Start of window (days ago, exclusive recent bound)
+            days_end: End of window (days ago, maximum age)
+
+        Returns:
+            List of {"time": str, "watts": float} dicts, empty list on error.
+        """
+        if not self._enabled:
+            return []
+        try:
+            query = (
+                f"SELECT mean(home_power) "
+                f"FROM Smartprice "
+                f"WHERE time > now() - {days_end}d "
+                f"AND time <= now() - {days_start}d "
+                f"GROUP BY time(1h) fill(none)"
+            )
+            resp = requests.get(
+                f"{self._base_url}/query",
+                params={"db": self.database, "q": query},
+                auth=self._auth,
+                verify=self._verify,
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            results = []
+            for series in data.get("results", [{}])[0].get("series", []):
+                for row in series.get("values", []):
+                    if row[1] is not None:
+                        results.append({"time": row[0], "watts": float(row[1])})
+            return results
+        except Exception as e:
+            log("warning", f"InfluxDB query_home_power_hourly error: {e}")
+            return []
+
     def get_history_hours(self, hours: int = 24) -> list:
         """Return recent state history from InfluxDB (for RL bootstrap).
         Returns list of dicts with price_ct, battery_soc, pv_power fields."""

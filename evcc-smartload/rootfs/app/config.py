@@ -7,6 +7,7 @@ Driver / Telegram config from /config/drivers.yaml.
 """
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
@@ -101,6 +102,13 @@ class Config:
     sequencer_enabled: bool = True
     sequencer_default_charge_power_kw: float = 11.0
 
+    # --- Home Assistant integration (optional) ---
+    # Used by ConsumptionForecaster for energy entity discovery via WebSocket.
+    # Inside HA add-ons, ha_url defaults to "http://supervisor/core" and
+    # ha_token is auto-populated from SUPERVISOR_TOKEN env var if present.
+    ha_url: str = ""
+    ha_token: str = ""
+
     # --- Web server ---
     api_port: int = 8099
 
@@ -170,9 +178,31 @@ def load_config() -> Config:
                 setattr(cfg, k, v)
 
         cfg.vehicle_providers = _load_vehicle_providers()
+        _apply_ha_supervisor_defaults(cfg)
         return cfg
     except Exception as e:
         log("warning", f"Could not load config: {e}, using defaults")
         cfg = Config()
         cfg.vehicle_providers = _load_vehicle_providers()
+        _apply_ha_supervisor_defaults(cfg)
         return cfg
+
+
+def _apply_ha_supervisor_defaults(cfg: Config) -> None:
+    """Auto-populate HA connection fields when running inside a HA add-on.
+
+    Inside HA add-ons, SUPERVISOR_TOKEN is set automatically by the supervisor.
+    If present and ha_url/ha_token are not already configured, use the internal
+    supervisor API endpoint and the supervisor token.
+
+    See Research open question 1: supervisor API is available at
+    http://supervisor/core inside HA add-ons with SUPERVISOR_TOKEN env var.
+    """
+    supervisor_token = os.environ.get("SUPERVISOR_TOKEN")
+    if supervisor_token:
+        if not cfg.ha_url:
+            cfg.ha_url = "http://supervisor/core"
+            log("info", "Config: ha_url auto-set to http://supervisor/core (HA add-on mode)")
+        if not cfg.ha_token:
+            cfg.ha_token = supervisor_token
+            log("info", "Config: ha_token auto-set from SUPERVISOR_TOKEN env var")
