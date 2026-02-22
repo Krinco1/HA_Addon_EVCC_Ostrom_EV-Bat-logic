@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 2 — Vehicle Reliability
+**Current focus:** Phase 3 — Data Foundation
 
 ## Current Position
 
-Phase: 2 of 8 (Vehicle Reliability)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-02-22 — Completed plan 02-02: RL bootstrap cap, progress logging, and price field fix
+Phase: 3 of 8 (Data Foundation)
+Plan: 2 of 3 in current phase
+Status: In progress
+Last activity: 2026-02-22 — Completed plan 03-02: PVForecaster with evcc solar tariff integration and correction coefficient
 
-Progress: [████░░░░░░] 25%
+Progress: [████░░░░░░] 31%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 4 min
+- Total plans completed: 6
+- Average duration: 3 min
 - Total execution time: 0.3 hours
 
 **By Phase:**
@@ -29,9 +29,10 @@ Progress: [████░░░░░░] 25%
 |-------|-------|-------|----------|
 | Phase 1 | 2 | 12 min | 6 min |
 | Phase 2 | 2 | 7 min | 3.5 min |
+| Phase 3 | 2 (of 3) | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 8 min, 4 min, 2 min, 5 min
+- Last 5 plans: 8 min, 4 min, 2 min, 5 min, 2 min
 - Trend: improving
 
 *Updated after each plan completion*
@@ -63,6 +64,11 @@ Recent decisions affecting current work:
 - [02-02]: Price conversion heuristic price_ct > 1.0 distinguishes ct/kWh (e.g. 28.5) from EUR/kWh legacy values (e.g. 0.285); covers Tibber and aWATTar dynamic tariff formats
 - [02-02]: getattr with default 1000 in main.py provides forward-compatible access to rl_bootstrap_max_records for options.json schema mismatches
 - [02-02]: InfluxDB _enabled guard added to bootstrap to skip cleanly when InfluxDB not configured
+- [03-02]: Correction EMA alpha=0.1 per 15-min cycle: smoother reaction, avoids overcorrecting on transient clouds
+- [03-02]: Correction bounds [0.3, 3.0]: wider than consumption [0.5, 1.5] because PV can legitimately be 3x forecast on unexpectedly sunny days
+- [03-02]: Variable slot duration computed per slot via (end - start).total_seconds(): handles mixed 15-min and 1h evcc slot sources
+- [03-02]: future_hours sums actual slot durations (not slot count) for accurate partial forecast detection
+- [03-02]: Only _correction persisted to disk (not _slots): forecast data is ephemeral, re-fetched hourly
 
 ### Pending Todos
 
@@ -74,10 +80,10 @@ None yet.
 - [Phase 5]: DynamicBufferCalc formula coefficients (spread_bonus 0.3, pv_reduction 2.0) are design estimates — plan 2-4 week observation period before enabling live buffer changes
 - [Phase 8]: RL constraint audit required before promoting from shadow to advisory — 30-day minimum shadow period; SeasonalLearner needs months for statistically meaningful cells
 - [Research gap]: PV forecast from evcc solar tariff is a price signal, not kWh generation — resolution needed in Phase 3 planning (Forecast.Solar API integration vs InfluxDB irradiance history)
-- [Research gap]: evcc sometimes returns partial forecasts (6h/12h vs 24h) — HorizonPlanner must handle gracefully; frequency of this in German dynamic tariff context (Tibber/aWATTar) unvalidated
+- [Research gap RESOLVED by 03-02]: evcc partial forecasts now handled via coverage_hours / 24.0 confidence ratio — PVForecaster returns 96 zeros with confidence=0.0 on total failure; Plan 03 wires this into planner conservatism
 
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 02-02-PLAN.md — RL bootstrap cap, progress logging, and price field fix (Phase 2 complete)
-Resume file: .planning/phases/03-forecast-integration/ (Phase 3, Plan 1)
+Stopped at: Completed 03-02-PLAN.md — PVForecaster with evcc solar tariff integration and correction coefficient
+Resume file: .planning/phases/03-data-foundation/03-03-PLAN.md (Phase 3, Plan 3)

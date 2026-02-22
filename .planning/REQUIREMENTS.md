@@ -21,7 +21,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 - [ ] **PLAN-02**: Statische Euro-Ladegrenzen (ev_max_price_ct, battery_max_price_ct) werden durch dynamische planbasierte Optimierung ersetzt
 - [ ] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
 - [ ] **PLAN-04**: Hausverbrauch wird aus HA-Datenbank/InfluxDB-Historie hochgerechnet und in Planung berücksichtigt
-- [ ] **PLAN-05**: PV-Ertragsprognose wird via evcc Solar-Tariff API bezogen und in den 24-48h Plan integriert
+- [x] **PLAN-05**: PV-Ertragsprognose wird via evcc Solar-Tariff API bezogen und in den 24-48h Plan integriert
 
 ### Transparenz
 
@@ -84,7 +84,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PLAN-02 | Phase 4 | Pending |
 | PLAN-03 | Phase 5 | Pending |
 | PLAN-04 | Phase 3 | Pending |
-| PLAN-05 | Phase 3 | Pending |
+| PLAN-05 | Phase 3 | Complete |
 | TRAN-01 | Phase 6 | Pending |
 | TRAN-02 | Phase 6 | Pending |
 | TRAN-03 | Phase 8 | Pending |

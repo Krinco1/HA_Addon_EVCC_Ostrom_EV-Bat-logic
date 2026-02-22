@@ -65,8 +65,8 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — ConsumptionForecaster with tiered InfluxDB aggregation, HA entity discovery, and persistent versioned model
-- [ ] 03-02-PLAN.md — PVForecaster with evcc solar tariff integration, correction coefficient, and partial forecast handling
+- [x] 03-01-PLAN.md — ConsumptionForecaster with tiered InfluxDB aggregation, HA entity discovery, and persistent versioned model
+- [x] 03-02-PLAN.md — PVForecaster with evcc solar tariff integration, correction coefficient, and partial forecast handling
 - [ ] 03-03-PLAN.md — Wire forecasters into main loop, extend StateStore, dashboard 24h SVG forecast chart with SSE
 
 ### Phase 4: Predictive Planner
@@ -162,7 +162,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 |-------|----------------|--------|-----------|
 | 1. State Infrastructure | 2/2 | Complete    | 2026-02-22 |
 | 2. Vehicle Reliability | 2/2 | Complete    | 2026-02-22 |
-| 3. Data Foundation | 0/3 | Not started | - |
+| 3. Data Foundation | 2/3 | In progress | - |
 | 4. Predictive Planner | 0/3 | Not started | - |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
