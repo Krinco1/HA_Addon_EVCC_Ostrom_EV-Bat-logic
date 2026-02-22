@@ -16,7 +16,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-from state import Action, SystemState
+from state import Action, PlanHorizon, SystemState
 
 
 class StateStore:
@@ -53,6 +53,9 @@ class StateStore:
         self._forecaster_ready: bool = False
         self._forecaster_data_days: int = 0
         self._ha_warnings: List[str] = []
+
+        # --- Phase 4: LP plan storage (guarded by _lock) ---
+        self._plan: Optional[PlanHorizon] = None
 
         # --- SSE client queues (guarded by _sse_lock, separate from _lock) ---
         self._sse_clients: List[queue.Queue] = []
@@ -103,6 +106,24 @@ class StateStore:
         # Broadcast outside the lock — iterates client queues (I/O)
         self._broadcast(snap)
 
+    def update_plan(self, plan: PlanHorizon) -> None:
+        """Store the latest LP plan under RLock.
+
+        Does NOT broadcast SSE — plan data is included in the next regular
+        update() broadcast via _snapshot_unlocked() / _snapshot_to_json_dict().
+        """
+        with self._lock:
+            self._plan = plan
+
+    def get_plan(self) -> Optional[PlanHorizon]:
+        """Return the latest LP plan (or None if not yet computed).
+
+        PlanHorizon is immutable after construction (dataclass), so returning
+        the reference directly is safe without deep-copying.
+        """
+        with self._lock:
+            return self._plan
+
     # ------------------------------------------------------------------
     # Read interface (called from web handlers)
     # ------------------------------------------------------------------
@@ -119,7 +140,7 @@ class StateStore:
 
     def _snapshot_unlocked(self) -> Dict:
         """Build snapshot dict; caller MUST hold self._lock."""
-        return {
+        snap = {
             "state": copy.copy(self._state),
             "lp_action": copy.copy(self._lp_action),
             "rl_action": copy.copy(self._rl_action),
@@ -135,6 +156,20 @@ class StateStore:
             "forecaster_data_days": self._forecaster_data_days,
             "ha_warnings": list(self._ha_warnings) if self._ha_warnings else [],
         }
+        # Phase 4: plan summary fields (lightweight — full slot timeline in Phase 6)
+        if self._plan is not None:
+            snap["plan_computed_at"] = self._plan.computed_at.isoformat() if self._plan.computed_at else None
+            snap["plan_solver_status"] = self._plan.solver_status
+            snap["plan_cost_eur"] = self._plan.solver_fun
+            snap["plan_slots_count"] = len(self._plan.slots)
+        else:
+            snap["plan_computed_at"] = None
+            snap["plan_solver_status"] = None
+            snap["plan_cost_eur"] = None
+            snap["plan_slots_count"] = 0
+        # Keep plan reference for _snapshot_to_json_dict (plan_summary SSE key)
+        snap["_plan"] = self._plan
+        return snap
 
     # ------------------------------------------------------------------
     # SSE client management
@@ -193,8 +228,25 @@ def _snapshot_to_json_dict(snap: Dict) -> Dict:
     state: Optional[SystemState] = snap.get("state")
     lp: Optional[Action] = snap.get("lp_action")
     last_update: Optional[datetime] = snap.get("last_update")
+    plan: Optional[PlanHorizon] = snap.get("_plan")
 
     p = state.price_percentiles if state else {}
+
+    # Phase 4: plan_summary — lightweight LP plan status for dashboard
+    if plan is not None:
+        slot0 = plan.slots[0] if plan.slots else None
+        plan_summary = {
+            "computed_at": plan.computed_at.isoformat() if plan.computed_at else None,
+            "status": plan.solver_status,
+            "cost_eur": plan.solver_fun,
+            "current_action": {
+                "bat_charge": plan.current_bat_charge,
+                "bat_discharge": plan.current_bat_discharge,
+                "ev_charge": plan.current_ev_charge,
+            },
+        }
+    else:
+        plan_summary = None
 
     return {
         "last_update": last_update.isoformat() if last_update else None,
@@ -232,4 +284,6 @@ def _snapshot_to_json_dict(snap: Dict) -> Dict:
             "forecaster_data_days": snap.get("forecaster_data_days", 0),
             "ha_warnings": snap.get("ha_warnings", []),
         },
+        # Phase 4: plan_summary — lightweight LP plan status for dashboard
+        "plan_summary": plan_summary,
     }
