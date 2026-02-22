@@ -35,6 +35,7 @@ class VehicleMonitor:
         self._refresh_requested: set = set()
         self._poll_interval_sec = cfg.vehicle_poll_interval_minutes * 60
         self._last_poll: Dict[str, float] = {}
+        self._prev_connected: Dict[str, bool] = {}
         self._thread: Optional[threading.Thread] = None
 
     def start_polling(self):
@@ -117,6 +118,15 @@ class VehicleMonitor:
             for name, v in self._manager.get_all_vehicles().items():
                 manual = self.manual_store.get(name)
                 v.manual_soc = manual
+
+            # Connection-event detection: trigger immediate API refresh on connect
+            pollable = set(self._manager.get_pollable_names())
+            for name, v in self._manager.get_all_vehicles().items():
+                was_connected = self._prev_connected.get(name, False)
+                if v.connected_to_wallbox and not was_connected and name in pollable:
+                    log("info", f"VehicleMonitor: {name} connected -- triggering immediate SoC refresh")
+                    self.trigger_refresh(name)
+                self._prev_connected[name] = v.connected_to_wallbox
         except Exception as e:
             log("error", f"VehicleMonitor update_from_evcc error: {e}")
 
