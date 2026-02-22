@@ -47,12 +47,11 @@ Plans:
   2. When a vehicle finishes charging and a second vehicle is waiting, the charge sequencer switches to the second vehicle within one decision cycle (under 5 minutes), not up to 15 minutes later
   3. On a Raspberry Pi with limited RAM, the add-on starts in under 3 minutes and uses less than 256 MB peak memory during RL bootstrap, regardless of how many months of InfluxDB history exist
   4. The RL bootstrap logs progress (e.g., "Loading history: 847/1000 records") so the user knows startup is not frozen
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Fix vehicle SoC staleness detection for wallbox-connected vehicles (evcc_provider + VehicleMonitor stale-detection logic)
-- [ ] 02-02: Refactor ChargeSequencer to event-driven transitions via StateStore callback with 15-min polling fallback; add starvation threshold and override expiry
-- [ ] 02-03: Cap and stream RL bootstrap: reservoir sampling to 1000 records max, batch streaming, progress logging
+- [ ] 02-01-PLAN.md — Connection-event SoC refresh and sequencer SoC sync in decision loop
+- [ ] 02-02-PLAN.md — RL bootstrap with record cap, progress logging, and price field fix
 
 ### Phase 3: Data Foundation
 **Goal**: The planner has accurate house consumption forecasts and PV generation estimates to plan against, sourced from real historical data
@@ -161,7 +160,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. State Infrastructure | 2/2 | Complete    | 2026-02-22 |
-| 2. Vehicle Reliability | 0/3 | Not started | - |
+| 2. Vehicle Reliability | 0/2 | Not started | - |
 | 3. Data Foundation | 0/2 | Not started | - |
 | 4. Predictive Planner | 0/3 | Not started | - |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
