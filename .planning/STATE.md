@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 3 — Data Foundation
+**Current focus:** Phase 4 — Predictive Planner
 
 ## Current Position
 
-Phase: 3 of 8 (Data Foundation) — COMPLETE
-Plan: 3 of 3 in current phase — all complete
-Status: Complete — ready for Phase 4
-Last activity: 2026-02-22 — Completed all 3 plans in Phase 3 (Data Foundation); dashboard forecast visualization approved
+Phase: 4 of 8 (Predictive Planner) — In Progress
+Plan: 1 of 3 in current phase — complete
+Status: In Progress — 04-01 complete, 04-02 next
+Last activity: 2026-02-22 — Completed 04-01 (HorizonPlanner LP engine with scipy/HiGHS)
 
-Progress: [█████░░░░░] 40%
+Progress: [█████░░░░░] 43%
 
 ## Performance Metrics
 
@@ -36,6 +36,10 @@ Progress: [█████░░░░░] 40%
 - Trend: improving
 
 *Updated after each plan completion*
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| Phase 4 | 1 (of 3) | 4 min | 4 min |
 
 ## Accumulated Context
 
@@ -77,6 +81,10 @@ Recent decisions affecting current work:
 - [03-03]: PV unit auto-detection in renderForecastChart: pvMax > 20 means Watts, else kW (same heuristic as state.py)
 - [03-03]: apply_correction() only called when current_forecast[0] > 100W to avoid meaningless correction on cold-start defaults
 - [03-03]: Forecast section added to SSE JSON payload via _snapshot_to_json_dict() — enables live chart updates without additional polling
+- [Phase 04-01]: Lazy scipy import inside _solve_lp() prevents ImportError at module load time
+- [Phase 04-01]: PV surplus reduces effective LP objective price coefficient proportionally (Pitfall 3 mitigation)
+- [Phase 04-01]: Mutual exclusion guard bat_charge+bat_discharge<=P_max prevents LP degeneracy at unit efficiency
+- [Phase 04-01]: Config max-price (ev_max_price_ct/battery_max_price_ct) enforced as 10x LP objective penalty, not hard bound
 
 ### Pending Todos
 
@@ -93,5 +101,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 03-03-PLAN.md — Phase 3 Data Foundation complete, all 3 plans done
-Next: Phase 4 (Predictive Planner) — 04-01-PLAN.md
+Stopped at: Completed 04-01-PLAN.md — HorizonPlanner LP engine with scipy/HiGHS; PlanHorizon/DispatchSlot dataclasses
+Next: Phase 4 (Predictive Planner) — 04-02-PLAN.md (main loop integration)

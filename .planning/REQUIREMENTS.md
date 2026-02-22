@@ -17,7 +17,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 
 ### Prädiktive Planung
 
-- [ ] **PLAN-01**: System erstellt einen 24-48h Rolling-Horizon Energieplan der Batterie und EV gemeinsam optimiert
+- [x] **PLAN-01**: System erstellt einen 24-48h Rolling-Horizon Energieplan der Batterie und EV gemeinsam optimiert
 - [ ] **PLAN-02**: Statische Euro-Ladegrenzen (ev_max_price_ct, battery_max_price_ct) werden durch dynamische planbasierte Optimierung ersetzt
 - [ ] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
 - [x] **PLAN-04**: Hausverbrauch wird aus HA-Datenbank/InfluxDB-Historie hochgerechnet und in Planung berücksichtigt
@@ -80,7 +80,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RELI-03 | Phase 1 | Complete — 01-01-PLAN.md |
 | RELI-04 | Phase 1 | Complete — 01-02-PLAN.md |
 | RELI-05 | Phase 2 | Complete — 02-02-PLAN.md |
-| PLAN-01 | Phase 4 | Pending |
+| PLAN-01 | Phase 4 | Complete |
 | PLAN-02 | Phase 4 | Pending |
 | PLAN-03 | Phase 5 | Pending |
 | PLAN-04 | Phase 3 | Complete |
