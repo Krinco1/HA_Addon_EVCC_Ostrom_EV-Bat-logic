@@ -5,6 +5,7 @@ FROM ${BUILD_FROM}
 RUN apk add --no-cache \
     py3-pip \
     py3-yaml \
+    py3-scipy \
     && pip3 install --no-cache-dir --break-system-packages \
         pyyaml \
         numpy \

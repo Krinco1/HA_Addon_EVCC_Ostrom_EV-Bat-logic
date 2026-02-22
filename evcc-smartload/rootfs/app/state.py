@@ -365,3 +365,41 @@ def calc_solar_surplus_kwh(solar_forecast: List[Dict],
         total_surplus += surplus_kw * gap_h
 
     return min(total_surplus, 100.0)
+
+
+# =============================================================================
+# Predictive Planner data structures (Phase 4)
+# =============================================================================
+
+@dataclass
+class DispatchSlot:
+    """Decision for one 15-min slot in the horizon."""
+    slot_index: int              # 0..95 (0 = current slot)
+    slot_start: datetime         # UTC timestamp of slot start
+    bat_charge_kw: float         # kW battery charges from grid (0 if not charging)
+    bat_discharge_kw: float      # kW battery discharges to home (0 if not discharging)
+    ev_charge_kw: float          # kW EV charges from grid (0 if not charging)
+    ev_name: str                 # which EV (empty string if no EV)
+    price_eur_kwh: float         # grid price for this slot
+    pv_kw: float                 # PV generation forecast for this slot
+    consumption_kw: float        # expected house consumption for this slot (kW)
+    bat_soc_pct: float           # battery SoC at start of slot (% from LP)
+    ev_soc_pct: float            # EV SoC at start of slot (% from LP)
+
+
+@dataclass
+class PlanHorizon:
+    """Complete rolling-horizon plan for the next 24h.
+
+    MPC note: SoC drift due to efficiency model-plant mismatch is corrected
+    each cycle by re-initializing bat_soc[0] from state.battery_soc.
+    Plans are never cached — recomputed fresh every 15-min cycle.
+    """
+    computed_at: datetime        # when this plan was computed (UTC)
+    slots: List[DispatchSlot]    # 96 slots (or fewer if price data short)
+    solver_status: int           # linprog result.status (0=optimal)
+    solver_fun: float            # objective value (total cost in EUR)
+    current_bat_charge: bool     # True if battery should charge this slot
+    current_bat_discharge: bool  # True if battery should discharge this slot
+    current_ev_charge: bool      # True if EV should charge this slot
+    current_price_limit: float   # effective price limit for this slot (EUR/kWh)
