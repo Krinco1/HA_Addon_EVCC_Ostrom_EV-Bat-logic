@@ -64,6 +64,10 @@ Recent decisions affecting current work:
 - [02-02]: Price conversion heuristic price_ct > 1.0 distinguishes ct/kWh (e.g. 28.5) from EUR/kWh legacy values (e.g. 0.285); covers Tibber and aWATTar dynamic tariff formats
 - [02-02]: getattr with default 1000 in main.py provides forward-compatible access to rl_bootstrap_max_records for options.json schema mismatches
 - [02-02]: InfluxDB _enabled guard added to bootstrap to skip cleanly when InfluxDB not configured
+- [03-01]: Single unified consumption profile (no weekday/weekend split) — simplicity first, seasonal split deferred to Phase 8
+- [03-01]: SUPERVISOR_TOKEN auto-detection in load_config() — ha_url/ha_token auto-populated inside HA add-on without user config
+- [03-01]: Hourly save interval (every 4 updates) reduces InfluxDB I/O by 4x; data loss limited to last hour's EMA on crash
+- [03-01]: Tiered bootstrap weights 1.0/0.5 (7d@15min / 8-30d@1h) — recent patterns dominate, historical provides baseline
 - [03-02]: Correction EMA alpha=0.1 per 15-min cycle: smoother reaction, avoids overcorrecting on transient clouds
 - [03-02]: Correction bounds [0.3, 3.0]: wider than consumption [0.5, 1.5] because PV can legitimately be 3x forecast on unexpectedly sunny days
 - [03-02]: Variable slot duration computed per slot via (end - start).total_seconds(): handles mixed 15-min and 1h evcc slot sources
@@ -85,5 +89,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 03-02-PLAN.md — PVForecaster with evcc solar tariff integration and correction coefficient
+Stopped at: Completed 03-01-PLAN.md — ConsumptionForecaster with tiered InfluxDB aggregation and HA energy discovery (03-02 also completed by linter)
 Resume file: .planning/phases/03-data-foundation/03-03-PLAN.md (Phase 3, Plan 3)
