@@ -40,6 +40,13 @@ class InfluxDBClient:
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
 
+    def _auth_params(self) -> str:
+        """Return URL query string for InfluxDB authentication."""
+        if not self.username:
+            return ""
+        import urllib.parse
+        return f"&u={urllib.parse.quote(self.username)}&p={urllib.parse.quote(self.password)}"
+
     def write(self, measurement: str, fields: dict, tags: dict = None):
         """Write a data point to InfluxDB."""
         if not self._enabled:
@@ -60,17 +67,15 @@ class InfluxDBClient:
             )
 
             line = f"{measurement}{tag_str} {field_str}"
-            url = f"{self._base_url}/write?db={urllib.parse.quote(self.database)}&precision=s"
+            url = (f"{self._base_url}/write"
+                   f"?db={urllib.parse.quote(self.database)}"
+                   f"&precision=s{self._auth_params()}")
 
             req = urllib.request.Request(
                 url,
                 data=line.encode(),
                 method="POST",
             )
-            if self.username:
-                import base64
-                cred = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
-                req.add_header("Authorization", f"Basic {cred}")
 
             ssl_ctx = self._get_ssl_context()
             with urllib.request.urlopen(req, timeout=5, context=ssl_ctx) as resp:
@@ -120,12 +125,9 @@ class InfluxDBClient:
                      f"GROUP BY time(1h) fill(none)")
             url = (f"{self._base_url}/query"
                    f"?db={urllib.parse.quote(self.database)}"
-                   f"&q={urllib.parse.quote(query)}")
+                   f"&q={urllib.parse.quote(query)}"
+                   f"{self._auth_params()}")
             req = urllib.request.Request(url)
-            if self.username:
-                import base64
-                cred = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
-                req.add_header("Authorization", f"Basic {cred}")
             ssl_ctx = self._get_ssl_context()
             with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
                 data = _json.loads(resp.read())
