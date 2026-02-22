@@ -100,7 +100,7 @@ class InfluxDBClient:
             fields["battery_action"] = int(action.battery_action)
             fields["ev_action"] = int(action.ev_action)
 
-        self.write("smartload_state", fields)
+        self.write("Smartprice", fields)
 
     def get_history_hours(self, hours: int = 24) -> list:
         """Return recent state history from InfluxDB (for RL bootstrap).
@@ -109,7 +109,7 @@ class InfluxDBClient:
             return []
         try:
             query = (f"SELECT mean(price_ct), mean(battery_soc), mean(pv_power) "
-                     f"FROM smartload_state "
+                     f"FROM Smartprice "
                      f"WHERE time > now() - {hours}h "
                      f"GROUP BY time(1h) fill(none)")
 
