@@ -67,7 +67,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — ConsumptionForecaster with tiered InfluxDB aggregation, HA entity discovery, and persistent versioned model
 - [x] 03-02-PLAN.md — PVForecaster with evcc solar tariff integration, correction coefficient, and partial forecast handling
-- [ ] 03-03-PLAN.md — Wire forecasters into main loop, extend StateStore, dashboard 24h SVG forecast chart with SSE
+- [x] 03-03-PLAN.md — Wire forecasters into main loop, extend StateStore, dashboard 24h SVG forecast chart with SSE
 
 ### Phase 4: Predictive Planner
 **Goal**: A rolling-horizon LP optimizer produces a 24-48h joint battery and EV dispatch plan every decision cycle, replacing all static euro price limits
