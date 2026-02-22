@@ -136,6 +136,15 @@ class DataCollector:
 
     def start_background_collection(self):
         """Start background data collection thread."""
+        # Do first collection synchronously so get_current_state() works immediately
+        try:
+            self._collect_once()
+            if self._state:
+                log("info", "DataCollector: initial state collected successfully")
+            else:
+                log("warning", "DataCollector: initial collect returned no data (evcc reachable?)")
+        except Exception as e:
+            log("warning", f"DataCollector: initial collect failed: {e}")
         self._thread = threading.Thread(target=self._collect_loop, daemon=True)
         self._thread.start()
         log("info", f"DataCollector: collecting every {self.cfg.data_collect_interval_sec}s")
