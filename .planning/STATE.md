@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 ## Current Position
 
-Phase: 4 of 8 (Predictive Planner) — Complete
-Plan: 3 of 3 in current phase — complete
-Status: Phase 4 complete — all 3 plans done (LP engine, main loop integration, integration tests)
-Last activity: 2026-02-22 — Completed 04-03 (HorizonPlanner integration test suite, 14 test methods)
+Phase: 4.1 of 8 (Deploy Configuration) — Complete
+Plan: 1 of 1 in current phase — complete
+Status: Phase 4.1 complete — gap closure plan done (version 6.0.0, config schema, translations, repository.yaml)
+Last activity: 2026-02-22 — Completed 04.1-01 (version bump, config schema 35 fields, translations, repository metadata)
 
 Progress: [██████░░░░] 50%
 
@@ -40,6 +40,7 @@ Progress: [██████░░░░] 50%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | Phase 4 | 3 (of 3) | 12 min | 4 min |
+| Phase 04.1-deploy-configuration P01 | 5 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,9 @@ Recent decisions affecting current work:
 - [04-03]: sys.modules.setdefault() patches logging_util/config before planner import — prevents real file system access during tests without requiring mocking framework
 - [04-03]: battery_min_soc > battery_max_soc (90 > 10) is the reliable LP infeasibility trigger — HiGHS returns status=2, planner returns None
 - [04-03]: test_infeasible_ev_impossible_deadline uses try/except wrapper to assert no exception raised — both None and valid plan are acceptable LP outcomes
+- [Phase 04.1-01]: Version bumped to 6.0.0 reflecting LP Horizon Planner and PV forecasting capabilities added in Phases 3-4
+- [Phase 04.1-01]: sequencer_enabled uses bare true in options and bool (not bool?) in schema — has explicit default so not optional
+- [Phase 04.1-01]: config.yaml ends up with 35 fields total (original 27 + 8 new LP planner fields) — all 8 correctly added with options/schema/translation parity
 
 ### Pending Todos
 
@@ -107,5 +111,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-03-PLAN.md — HorizonPlanner integration test suite (14 tests, test_planner.py, 617 lines)
+Stopped at: Completed 04.1-01-PLAN.md — version 6.0.0, config.yaml 35 fields, translations en+de, repository.yaml channel:stable. Closed DEPLOY-02, DEPLOY-03, DEPLOY-05.
 Next: Phase 5 (Dynamic Buffer Calculation)
