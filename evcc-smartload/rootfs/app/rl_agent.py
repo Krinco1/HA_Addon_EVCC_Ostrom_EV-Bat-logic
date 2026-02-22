@@ -311,24 +311,51 @@ class DQNAgent:
             log("warning", f"Could not load RL model: {e}")
             return False
 
-    def bootstrap_from_influxdb(self, influx, hours: int = 168) -> int:
+    def bootstrap_from_influxdb(self, influx, hours: int = 168, max_records: int = 1000) -> int:
         """Bootstrap Q-table from historical InfluxDB data."""
         try:
+            # Guard: skip if InfluxDB is not configured
+            if hasattr(influx, "_enabled") and not influx._enabled:
+                log("info", "RL bootstrap: InfluxDB not configured -- skipping")
+                return 0
+
+            log("info", f"RL bootstrap: fetching up to {hours}h of InfluxDB history...")
             data = influx.get_history_hours(hours)
             if not data:
+                log("info", "RL bootstrap: no history available -- starting fresh")
                 return 0
+
+            total = min(len(data), max_records)
+            if len(data) > max_records:
+                log("warning", f"RL bootstrap: {len(data)} records found, capping at {max_records} (set rl_bootstrap_max_records in config to increase)")
+            log("info", f"RL bootstrap: processing {total} records...")
+
             learned = 0
             prev = None
-            for point in data:
+            for i, point in enumerate(data[:max_records]):
+                if i > 0 and i % 100 == 0:
+                    log("info", f"RL bootstrap: Loading history: {i}/{total} records")
                 try:
                     battery_soc = point.get("battery_soc") or 50
-                    price = point.get("price") or 0.30
+                    price_ct = point.get("price_ct") or point.get("price")
+                    if price_ct is None:
+                        price = 0.30
+                    elif price_ct > 1.0:  # it's in ct/kWh (e.g. 28.5), convert to EUR/kWh
+                        price = price_ct / 100
+                    else:  # already in EUR/kWh (legacy field)
+                        price = price_ct
                     state_vec = np.zeros(self.STATE_SIZE)
                     state_vec[0] = battery_soc / 100
                     state_vec[3] = price / 0.5
                     if prev:
                         delta = battery_soc - (prev.get("battery_soc") or 50)
-                        prev_price = prev.get("price") or 0.30
+                        prev_price_ct = prev.get("price_ct") or prev.get("price")
+                        if prev_price_ct is None:
+                            prev_price = 0.30
+                        elif prev_price_ct > 1.0:
+                            prev_price = prev_price_ct / 100
+                        else:
+                            prev_price = prev_price_ct
                         if delta > 2 and prev_price < 0.25:
                             # Was charging at cheap price → good
                             aidx = self._tuple_to_action(2, 0)  # charge_p40
@@ -355,8 +382,7 @@ class DQNAgent:
                     prev = point
                 except Exception:
                     continue
-            if learned:
-                log("info", f"✓ Bootstrapped {learned} experiences from InfluxDB")
+            log("info", f"RL bootstrap: complete -- {learned}/{total} experiences loaded")
             return learned
         except Exception as e:
             log("warning", f"Bootstrap from InfluxDB failed: {e}")
