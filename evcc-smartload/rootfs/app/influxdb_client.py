@@ -2,6 +2,9 @@
 InfluxDB 1.x client for EVCC-Smartload.
 
 Writes energy metrics to InfluxDB for historical analysis.
+
+v5.0.2: Added SSL support (influxdb_ssl config option).
+        Handles self-signed certificates on local networks.
 """
 
 from datetime import datetime, timezone
@@ -20,7 +23,22 @@ class InfluxDBClient:
         self.username = cfg.influxdb_username
         self.password = cfg.influxdb_password
         self._enabled = bool(self.host)
-        self._base_url = f"http://{self.host}:{self.port}"
+        self._ssl = getattr(cfg, "influxdb_ssl", False)
+        scheme = "https" if self._ssl else "http"
+        self._base_url = f"{scheme}://{self.host}:{self.port}"
+
+        if self._enabled:
+            log("info", f"InfluxDB: {self._base_url} (SSL={'on' if self._ssl else 'off'})")
+
+    def _get_ssl_context(self):
+        """Create SSL context that accepts self-signed certificates (local network)."""
+        if not self._ssl:
+            return None
+        import ssl
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
 
     def write(self, measurement: str, fields: dict, tags: dict = None):
         """Write a data point to InfluxDB."""
@@ -54,7 +72,8 @@ class InfluxDBClient:
                 cred = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
                 req.add_header("Authorization", f"Basic {cred}")
 
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            ssl_ctx = self._get_ssl_context()
+            with urllib.request.urlopen(req, timeout=5, context=ssl_ctx) as resp:
                 if resp.status not in (200, 204):
                     log("warning", f"InfluxDB write returned {resp.status}")
 
@@ -107,7 +126,8 @@ class InfluxDBClient:
                 import base64
                 cred = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
                 req.add_header("Authorization", f"Basic {cred}")
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            ssl_ctx = self._get_ssl_context()
+            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
                 data = _json.loads(resp.read())
             results = []
             for series in data.get("results", [{}])[0].get("series", []):

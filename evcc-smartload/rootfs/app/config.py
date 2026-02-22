@@ -42,6 +42,7 @@ class Config:
     influxdb_database: str = "smartprice"
     influxdb_username: str = "smartprice"
     influxdb_password: str = "smartprice"
+    influxdb_ssl: bool = False          # v5.0.2: HTTPS for InfluxDB connection
 
     # --- Home battery ---
     battery_capacity_kwh: float = 33.1
