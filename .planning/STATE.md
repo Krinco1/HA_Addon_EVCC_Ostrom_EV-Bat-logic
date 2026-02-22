@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 3 of 8 (Data Foundation)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-22 — Completed plan 03-02: PVForecaster with evcc solar tariff integration and correction coefficient
+Plan: 3 of 3 in current phase (awaiting human-verify checkpoint)
+Status: In progress — checkpoint reached
+Last activity: 2026-02-22 — Completed plans 03-01, 03-02, 03-03 tasks 1-2; awaiting dashboard verification at checkpoint
 
-Progress: [████░░░░░░] 31%
+Progress: [█████░░░░░] 38%
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [████░░░░░░] 31%
 |-------|-------|-------|----------|
 | Phase 1 | 2 | 12 min | 6 min |
 | Phase 2 | 2 | 7 min | 3.5 min |
-| Phase 3 | 2 (of 3) | 4 min | 2 min |
+| Phase 3 | 3 (of 3) | 7 min | 2.3 min |
 
 **Recent Trend:**
 - Last 5 plans: 8 min, 4 min, 2 min, 5 min, 2 min
@@ -73,6 +73,10 @@ Recent decisions affecting current work:
 - [03-02]: Variable slot duration computed per slot via (end - start).total_seconds(): handles mixed 15-min and 1h evcc slot sources
 - [03-02]: future_hours sums actual slot durations (not slot count) for accurate partial forecast detection
 - [03-02]: Only _correction persisted to disk (not _slots): forecast data is ephemeral, re-fetched hourly
+- [03-03]: Price zone classification uses current price_percentiles P30/P60 as proxy for all 96 slots — proper per-slot classification deferred to Phase 4 when planner generates slot-level decisions
+- [03-03]: PV unit auto-detection in renderForecastChart: pvMax > 20 means Watts, else kW (same heuristic as state.py)
+- [03-03]: apply_correction() only called when current_forecast[0] > 100W to avoid meaningless correction on cold-start defaults
+- [03-03]: Forecast section added to SSE JSON payload via _snapshot_to_json_dict() — enables live chart updates without additional polling
 
 ### Pending Todos
 
@@ -89,5 +93,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 03-01-PLAN.md — ConsumptionForecaster with tiered InfluxDB aggregation and HA energy discovery (03-02 also completed by linter)
-Resume file: .planning/phases/03-data-foundation/03-03-PLAN.md (Phase 3, Plan 3)
+Stopped at: 03-03-PLAN.md checkpoint:human-verify (Task 3) — both auto tasks complete, awaiting dashboard verification
+Resume file: .planning/phases/03-data-foundation/03-03-PLAN.md (Task 3: verify dashboard forecast visualization)
