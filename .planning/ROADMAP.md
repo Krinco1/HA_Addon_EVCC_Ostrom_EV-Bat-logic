@@ -13,7 +13,7 @@ SmartLoad v6 transforms a reliable reactive optimizer into a proactive 24-48h pr
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: State Infrastructure** - Thread-safe StateStore and startup config validation eliminate race conditions and misconfiguration crashes
-- [ ] **Phase 2: Vehicle Reliability** - Accurate live vehicle SoC, immediate charge sequencer transitions, and bounded RL bootstrap memory
+- [x] **Phase 2: Vehicle Reliability** - Accurate live vehicle SoC, immediate charge sequencer transitions, and bounded RL bootstrap memory
 - [ ] **Phase 3: Data Foundation** - Consumption history forecasting from HA/InfluxDB and PV generation estimates from evcc solar tariff integrated into planning inputs
 - [ ] **Phase 4: Predictive Planner** - Rolling-horizon 24-48h LP optimizer replaces static euro price limits with joint battery and EV dispatch planning
 - [ ] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day
@@ -50,8 +50,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Connection-event SoC refresh and sequencer SoC sync in decision loop
-- [ ] 02-02-PLAN.md — RL bootstrap with record cap, progress logging, and price field fix
+- [x] 02-01-PLAN.md — Connection-event SoC refresh and sequencer SoC sync in decision loop
+- [x] 02-02-PLAN.md — RL bootstrap with record cap, progress logging, and price field fix
 
 ### Phase 3: Data Foundation
 **Goal**: The planner has accurate house consumption forecasts and PV generation estimates to plan against, sourced from real historical data
@@ -160,7 +160,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. State Infrastructure | 2/2 | Complete    | 2026-02-22 |
-| 2. Vehicle Reliability | 1/2 | In Progress|  |
+| 2. Vehicle Reliability | 2/2 | Complete   | 2026-02-22 |
 | 3. Data Foundation | 0/2 | Not started | - |
 | 4. Predictive Planner | 0/3 | Not started | - |
 | 5. Dynamic Buffer | 0/1 | Not started | - |

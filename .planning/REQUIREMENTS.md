@@ -13,7 +13,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 - [x] **RELI-02**: Charge Sequencer wechselt sofort zum nächsten Fahrzeug wenn aktuelles Fahrzeug fertig geladen ist (keine 15-Min-Verzögerung)
 - [x] **RELI-03**: Web-Server State-Updates sind thread-safe — keine Race Conditions zwischen Decision-Loop, Web-Requests und Polling-Threads
 - [x] **RELI-04**: Ungültige Konfiguration wird beim Start erkannt und mit klarer Fehlermeldung gemeldet
-- [ ] **RELI-05**: RL Bootstrap begrenzt Speicherverbrauch und zeigt Fortschritt an
+- [x] **RELI-05**: RL Bootstrap begrenzt Speicherverbrauch und zeigt Fortschritt an
 
 ### Prädiktive Planung
 
@@ -79,7 +79,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RELI-02 | Phase 2 | Complete |
 | RELI-03 | Phase 1 | Complete — 01-01-PLAN.md |
 | RELI-04 | Phase 1 | Complete — 01-02-PLAN.md |
-| RELI-05 | Phase 2 | Pending |
+| RELI-05 | Phase 2 | Complete — 02-02-PLAN.md |
 | PLAN-01 | Phase 4 | Pending |
 | PLAN-02 | Phase 4 | Pending |
 | PLAN-03 | Phase 5 | Pending |
