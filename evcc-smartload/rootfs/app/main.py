@@ -1,9 +1,14 @@
 """
-EVCC-Smartload v5.0 – Hybrid LP + Shadow RL + Charge Sequencer
+EVCC-Smartload v6.0 – Hybrid LP + Shadow RL + Charge Sequencer
 
 Entry point. Initialises all components and runs the main decision loop.
 
-v5 additions:
+v6 additions:
+  - StateStore: thread-safe, RLock-guarded single source of truth for shared state
+  - All state writes go through store.update(); web server reads only via snapshot()
+  - SSE endpoint /events broadcasts live state to dashboard (no polling required)
+
+v5 additions (preserved):
   - Percentile computation every cycle (state.price_percentiles)
   - ChargeSequencer for multi-EV coordination
   - DriverManager + Telegram Bot (optional, requires drivers.yaml)
@@ -20,6 +25,7 @@ from config import load_config
 from evcc_client import EvccClient
 from influxdb_client import InfluxDBClient
 from state import Action, ManualSocStore, SystemState, calc_solar_surplus_kwh, compute_price_percentiles
+from state_store import StateStore
 from decision_log import DecisionLog, log_main_cycle
 from optimizer import HolisticOptimizer, EventDetector
 from rl_agent import DQNAgent
@@ -45,6 +51,9 @@ def main():
     evcc = EvccClient(cfg)
     influx = InfluxDBClient(cfg)
     manual_store = ManualSocStore()
+
+    # --- v6: StateStore — single source of truth for shared state ---
+    store = StateStore()
 
     # --- Energy management ---
     vehicle_monitor = VehicleMonitor(evcc, cfg, manual_store)
@@ -100,8 +109,10 @@ def main():
     vehicle_monitor.start_polling()
 
     decision_log = DecisionLog(max_entries=100)
+
+    # --- v6: Pass StateStore to WebServer (read-only consumer) ---
     web = WebServer(
-        cfg, optimizer, rl_agent, comparator, event_detector,
+        cfg, store, optimizer, rl_agent, comparator, event_detector,
         collector, vehicle_monitor, rl_devices, manual_store,
         decision_log=decision_log,
         sequencer=sequencer,
@@ -121,7 +132,7 @@ def main():
     }
     registered_rl_lower: set = {n.lower() for n in registered_rl_devices}
 
-    log("info", "Starting main decision loop (v5)...")
+    log("info", "Starting main decision loop (v6)...")
 
     while True:
         try:
@@ -210,8 +221,15 @@ def main():
                     tariffs, state, cfg,
                 )
 
-            # --- Update web server ---
-            web.update_state(state, lp_action, rl_action, solar_forecast=solar_forecast)
+            # --- v6: Update StateStore (replaces web.update_state) ---
+            # All state writes go through StateStore; web server reads only via snapshot().
+            # This call also broadcasts to all connected SSE clients.
+            store.update(
+                state=state,
+                lp_action=lp_action,
+                rl_action=rl_action,
+                solar_forecast=solar_forecast,
+            )
 
             # --- RL learning ---
             rl_agent.imitation_learn(state, lp_action)

@@ -120,6 +120,18 @@
         .links a:hover { text-decoration: underline; }
         .btn-manual { background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9em; }
 
+        /* v6: SSE connection indicator */
+        .sse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #555; margin-right: 5px; transition: background 0.4s; }
+        .sse-dot.connected { background: #00ff88; box-shadow: 0 0 4px #00ff88; }
+        .sse-dot.error { background: #ff4444; }
+
+        /* v6: Value highlight flash on SSE update */
+        @keyframes sse-flash { 0% { background: rgba(0,212,255,0.25); } 100% { background: transparent; } }
+        .sse-updated { animation: sse-flash 1.5s ease-out; border-radius: 4px; }
+
+        /* v6: Update age label */
+        .update-age { font-size: 0.75em; color: #555; margin-left: 6px; font-weight: normal; }
+
         /* Mobile */
         .container { max-width: 1100px; margin: 0 auto; padding: 10px; }
         .header h1 { font-size: 1.2em; }
@@ -170,14 +182,17 @@
 <div class="container">
     <div class="header">
         <h1>⚡ EVCC-Smartload</h1>
-        <span class="version">v{{version}} &bull; Hybrid LP + Shadow RL</span>
+        <span class="version">
+            v{{version}} &bull; Hybrid LP + Shadow RL
+            &bull; <span class="sse-dot" id="sseDot" title="Live-Verbindung"></span><span id="sseStatus" style="color:#555;font-size:0.85em;">Verbinde...</span>
+        </span>
     </div>
 
     <div class="status-grid" id="statusGrid">
-        <div class="status-card"><div class="label">Strompreis</div><div class="value blue" id="priceVal">--</div></div>
-        <div class="status-card"><div class="label">🔋 Hausbatterie</div><div class="value" id="batteryVal">--</div></div>
-        <div class="status-card"><div class="label">☀️ PV Leistung</div><div class="value green" id="pvVal">--</div></div>
-        <div class="status-card"><div class="label">🏠 Verbrauch</div><div class="value orange" id="homeVal">--</div></div>
+        <div class="status-card"><div class="label">Strompreis<span class="update-age" id="priceAge"></span></div><div class="value blue" id="priceVal">--</div></div>
+        <div class="status-card"><div class="label">🔋 Hausbatterie<span class="update-age" id="batteryAge"></span></div><div class="value" id="batteryVal">--</div></div>
+        <div class="status-card"><div class="label">☀️ PV Leistung<span class="update-age" id="pvAge"></span></div><div class="value green" id="pvVal">--</div></div>
+        <div class="status-card"><div class="label">🏠 Verbrauch<span class="update-age" id="homeAge"></span></div><div class="value orange" id="homeVal">--</div></div>
     </div>
 
     <!-- Strategy explanation -->

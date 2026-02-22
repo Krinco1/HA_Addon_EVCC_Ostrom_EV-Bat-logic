@@ -1,7 +1,14 @@
 """
-HTTP API server for EVCC-Smartload — v5.0
+HTTP API server for EVCC-Smartload — v6.0
 
-New in v5:
+New in v6:
+  - StateStore integration: web server is strictly read-only
+    (all state reads go through store.snapshot() — no direct state fields)
+  - ThreadedHTTPServer: handles SSE connections without blocking other requests
+  - GET /events — SSE endpoint pushing live state to connected browsers
+  - All API handlers use a single atomic snapshot() call per request
+
+v5 features preserved:
   - Constructor accepts optional sequencer, driver_mgr, notifier
   - GET /sequencer  — charge schedule + request status + quiet hours
   - GET /drivers    — driver/Telegram config overview (no secrets)
@@ -11,7 +18,9 @@ New in v5:
 """
 
 import json
+import queue
 import re
+import socketserver
 import threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -22,6 +31,7 @@ from typing import Dict, List, Optional
 from config import Config
 from logging_util import log
 from state import Action, ManualSocStore, SystemState, calc_solar_surplus_kwh
+from state_store import StateStore
 from version import VERSION
 
 from web.template_engine import render as render_template
@@ -30,15 +40,26 @@ from web.template_engine import render as render_template
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-class WebServer:
-    """Wraps the HTTP server and provides state-update hooks."""
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
+    """HTTPServer with per-request daemon threads.
 
-    def __init__(self, cfg: Config, optimizer, rl_agent, comparator,
-                 event_detector, collector, vehicle_monitor, rl_devices,
-                 manual_store: ManualSocStore, decision_log=None,
+    ThreadingMixIn ensures each request (including the long-lived SSE
+    connection at /events) runs in its own daemon thread, so SSE clients
+    do not block regular API requests.
+    """
+    daemon_threads = True
+
+
+class WebServer:
+    """Wraps the HTTP server. Read-only consumer of StateStore."""
+
+    def __init__(self, cfg: Config, store: StateStore, optimizer, rl_agent,
+                 comparator, event_detector, collector, vehicle_monitor,
+                 rl_devices, manual_store: ManualSocStore, decision_log=None,
                  # v5 optional
                  sequencer=None, driver_mgr=None, notifier=None):
         self.cfg = cfg
+        self._store = store
         self.lp = optimizer
         self.rl = rl_agent
         self.comparator = comparator
@@ -52,19 +73,6 @@ class WebServer:
         self.sequencer = sequencer
         self.driver_mgr = driver_mgr
         self.notifier = notifier
-
-        self._last_state: Optional[SystemState] = None
-        self._last_lp_action: Optional[Action] = None
-        self._last_rl_action: Optional[Action] = None
-        self._last_solar_forecast: List[Dict] = []
-
-    def update_state(self, state: SystemState, lp_action: Action, rl_action: Action,
-                     solar_forecast: List[Dict] = None):
-        self._last_state = state
-        self._last_lp_action = lp_action
-        self._last_rl_action = rl_action
-        if solar_forecast is not None:
-            self._last_solar_forecast = solar_forecast
 
     # ------------------------------------------------------------------
     # Start
@@ -99,8 +107,9 @@ class WebServer:
                 elif path == "/status":
                     self._json(srv._api_status())
                 elif path == "/slots":
+                    snap = srv._store.snapshot()
                     tariffs = srv.collector.evcc.get_tariff_grid()
-                    self._json(srv._api_slots(tariffs, srv._last_solar_forecast))
+                    self._json(srv._api_slots(tariffs, snap["solar_forecast"]))
                 elif path == "/vehicles":
                     self._json(srv._api_vehicles())
                 elif path == "/rl-devices":
@@ -123,13 +132,17 @@ class WebServer:
                     else:
                         self._json({"entries": [], "cycle": {}})
                 elif path == "/chart-data":
+                    snap = srv._store.snapshot()
                     tariffs = srv.collector.evcc.get_tariff_grid()
-                    self._json(srv._api_chart_data(tariffs, srv._last_solar_forecast))
+                    self._json(srv._api_chart_data(tariffs, snap["solar_forecast"]))
                 # v5 endpoints
                 elif path == "/sequencer":
                     self._json(srv._api_sequencer())
                 elif path == "/drivers":
                     self._json(srv._api_drivers())
+                # v6: SSE endpoint
+                elif path == "/events":
+                    self._sse_stream()
                 elif path == "/docs":
                     self._html(srv._docs_index())
                 elif path.startswith("/docs/"):
@@ -138,6 +151,32 @@ class WebServer:
                     srv._serve_static(self, path)
                 else:
                     self._json({"error": "not found"}, 404)
+
+            def _sse_stream(self):
+                """SSE endpoint: keeps connection alive, pushes state on each update."""
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+                client_q = srv._store.register_sse_client()
+                try:
+                    while True:
+                        try:
+                            data = client_q.get(timeout=30)
+                            payload = json.dumps(data, default=str)
+                            self.wfile.write(f"data: {payload}\n\n".encode())
+                            self.wfile.flush()
+                        except queue.Empty:
+                            # Keepalive comment — prevents proxy/browser timeout
+                            self.wfile.write(b": keepalive\n\n")
+                            self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
+                finally:
+                    srv._store.unregister_sse_client(client_q)
 
             def do_POST(self):
                 path = self.path
@@ -227,8 +266,10 @@ class WebServer:
                 self.end_headers()
 
         def _run():
-            server = HTTPServer(("0.0.0.0", self.cfg.api_port), Handler)
-            log("info", f"API server running on port {self.cfg.api_port}")
+            server = ThreadedHTTPServer(("0.0.0.0", self.cfg.api_port), Handler)
+            # Attach store reference to server so Handler can access it via self.server._store
+            server._store = self._store
+            log("info", f"API server running on port {self.cfg.api_port} (threaded, SSE enabled)")
             server.serve_forever()
 
         threading.Thread(target=_run, daemon=True).start()
@@ -256,10 +297,11 @@ class WebServer:
     # ------------------------------------------------------------------
 
     def _api_status(self) -> dict:
-        state = self._last_state
+        snap = self._store.snapshot()
+        state = snap["state"]
+        lp = snap["lp_action"]
         comparison = self.comparator.get_status()
         maturity = self._rl_maturity(comparison)
-        lp = self._last_lp_action
         p = state.price_percentiles if state else {}
         return {
             "timestamp": datetime.now().isoformat(),
@@ -339,10 +381,11 @@ class WebServer:
         }
 
     def _api_slots(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
+        snap = self._store.snapshot()
         return _calculate_charge_slots(
             tariffs=tariffs,
             cfg=self.cfg,
-            last_state=self._last_state,
+            last_state=snap["state"],
             vehicles=self.vehicle_monitor.get_all_vehicles(),
             solar_forecast=solar_forecast,
         )
@@ -360,7 +403,8 @@ class WebServer:
         }
 
     def _api_config(self) -> dict:
-        lp = self._last_lp_action
+        snap = self._store.snapshot()
+        lp = snap["lp_action"]
         return {
             "battery_max_ct": self.cfg.battery_max_price_ct,
             "ev_max_ct": self.cfg.ev_max_price_ct,
@@ -382,10 +426,11 @@ class WebServer:
         }
 
     def _api_summary(self) -> dict:
+        snap = self._store.snapshot()
         comp = self.comparator.get_status()
         m = self._rl_maturity(comp)
-        s = self._last_state
-        lp = self._last_lp_action
+        s = snap["state"]
+        lp = snap["lp_action"]
         return {
             "rl_ready": comp.get("rl_ready", False),
             "rl_maturity_percent": m["percent"],
@@ -444,9 +489,10 @@ class WebServer:
                 "message": f"Noch {mn - n} Vergleiche", "color": "lightgreen"}
 
     def _api_strategy(self) -> dict:
-        s = self._last_state
-        lp = self._last_lp_action
-        rl = self._last_rl_action
+        snap = self._store.snapshot()
+        s = snap["state"]
+        lp = snap["lp_action"]
+        rl = snap["rl_action"]
         if not s or not lp:
             return {"text": "Warte auf erste Daten...", "actions": []}
 
@@ -498,6 +544,10 @@ class WebServer:
         return {"text": " · ".join(texts[:2]), "details": texts, "actions": actions}
 
     def _api_chart_data(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
+        snap = self._store.snapshot()
+        state = snap["state"]
+        lp = snap["lp_action"]
+
         now = datetime.now(timezone.utc)
         prices = []
         for t in tariffs:
@@ -546,7 +596,6 @@ class WebServer:
             p["solar_kw"] = round(solar_by_hour.get(p["hour"], 0), 2)
 
         # v5: add percentile lines to chart data
-        state = self._last_state
         p20_ct = state.price_percentiles.get(20, 0) * 100 if state else 0
         p60_ct = state.price_percentiles.get(60, 0) * 100 if state else 0
 
@@ -557,7 +606,6 @@ class WebServer:
         total_solar_kwh = sum(solar_by_hour.values())
 
         # Active dynamic limits (from last optimizer decision)
-        lp = self._last_lp_action
         active_bat_ct = round(lp.battery_limit_eur * 100, 1) if lp and lp.battery_limit_eur else None
         active_ev_ct = round(lp.ev_limit_eur * 100, 1) if lp and lp.ev_limit_eur else None
 
@@ -649,6 +697,7 @@ pre{{background:#0f3460;padding:15px;border-radius:6px;}}code{{color:#00ff88;}}
 <h1>🔌 EVCC-Smartload API v{VERSION}</h1>
 <p>Basis-URL: <code>http://homeassistant:{self.cfg.api_port}</code></p>
 <div class="ep"><span class="m get">GET</span> <span class="path">/status</span><p>Vollständiger System-Status inkl. RL, Percentile, Sequencer-Status</p></div>
+<div class="ep"><span class="m get">GET</span> <span class="path">/events</span><p>v6: SSE-Stream — Live-Updates via Server-Sent Events (kein Polling)</p></div>
 <div class="ep"><span class="m get">GET</span> <span class="path">/vehicles</span><p>Alle Fahrzeuge mit SoC, Quelle, manuelle Overrides</p></div>
 <div class="ep"><span class="m get">GET</span> <span class="path">/slots</span><p>Ladeslots für alle Geräte</p></div>
 <div class="ep"><span class="m get">GET</span> <span class="path">/sequencer</span><p>v5: Lade-Zeitplan, Anfragen, Ruhezeit-Status</p></div>

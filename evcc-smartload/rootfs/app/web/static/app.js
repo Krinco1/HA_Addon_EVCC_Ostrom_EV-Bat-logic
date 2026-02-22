@@ -1,5 +1,12 @@
 /**
- * EVCC-Smartload Dashboard v5.0
+ * EVCC-Smartload Dashboard v6.0
+ *
+ * v6: SSE (Server-Sent Events) via /events for live state push.
+ *   - EventSource connects to /events on load.
+ *   - On each message, key values are updated in-place with a brief CSS flash.
+ *   - Persistent "vor X Min aktualisiert" timestamp per data point.
+ *   - Connection indicator (green dot = connected, grey = disconnected).
+ *   - Existing 60s polling preserved as fallback for non-SSE endpoints.
  *
  * Fetches /status, /slots, /vehicles, /strategy, /chart-data,
  *         /rl-devices, /decisions, /sequencer
@@ -8,6 +15,10 @@
 
 let currentVehicleId = '';
 let currentSeqVehicle = '';
+
+// v6: SSE state
+var _sseSource = null;
+var _sseLastUpdate = null;  // ISO string from last SSE message
 
 function $(id) { return document.getElementById(id); }
 
@@ -890,5 +901,172 @@ function escapeHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// =============================================================================
+// v6: SSE — Live state push
+// =============================================================================
+
+/**
+ * Format a duration in milliseconds as a human-readable "vor X Min" string.
+ */
+function formatAge(ms) {
+    var min = Math.floor(ms / 60000);
+    if (min < 1) return 'gerade eben';
+    if (min < 60) return 'vor ' + min + ' Min';
+    var h = Math.floor(min / 60);
+    var m = min % 60;
+    return 'vor ' + h + 'h ' + m + 'min';
+}
+
+/**
+ * Flash a CSS highlight on an element to signal a value change.
+ * Removes the class after 1.5 s so the animation can replay on next update.
+ */
+function flashUpdate(el) {
+    if (!el) return;
+    el.classList.remove('sse-updated');
+    // Force reflow so the animation restarts even if the class was just removed
+    void el.offsetWidth;
+    el.classList.add('sse-updated');
+    setTimeout(function() { el.classList.remove('sse-updated'); }, 1600);
+}
+
+/**
+ * Update the "vor X Min" age labels for all key status cards.
+ * Called every minute by setInterval.
+ */
+function updateAgeLabels() {
+    if (!_sseLastUpdate) return;
+    var ms = Date.now() - new Date(_sseLastUpdate).getTime();
+    var text = formatAge(ms);
+    var ids = ['priceAge', 'batteryAge', 'pvAge', 'homeAge'];
+    for (var i = 0; i < ids.length; i++) {
+        var el = $(ids[i]);
+        if (el) el.textContent = text;
+    }
+}
+
+/**
+ * Apply an SSE state message to the dashboard status cards.
+ * Only updates fields present in the message; falls back to polling for
+ * complex sections (chart, slots, RL, etc.).
+ */
+function applySSEUpdate(msg) {
+    var s = msg.state;
+    if (!s) return;
+
+    _sseLastUpdate = msg.last_update;
+
+    // --- Price ---
+    var priceEl = $('priceVal');
+    if (priceEl && s.current_price != null) {
+        var priceCt = s.current_price * 100;
+        var newPriceText = priceCt.toFixed(1) + ' ct';
+        if (priceEl.textContent !== newPriceText) {
+            priceEl.textContent = newPriceText;
+            priceEl.style.color = priceColor(priceCt);
+            flashUpdate(priceEl);
+        }
+    }
+
+    // --- Battery SoC ---
+    var batEl = $('batteryVal');
+    if (batEl && s.battery_soc != null) {
+        var newBatText = s.battery_soc.toFixed(0) + '%';
+        if (batEl.textContent !== newBatText) {
+            batEl.textContent = newBatText;
+            batEl.style.color = socColor(s.battery_soc);
+            flashUpdate(batEl);
+        }
+    }
+
+    // --- PV power ---
+    var pvEl = $('pvVal');
+    if (pvEl && s.pv_power != null) {
+        var newPvText = (s.pv_power / 1000).toFixed(1) + ' kW';
+        if (pvEl.textContent !== newPvText) {
+            pvEl.textContent = newPvText;
+            flashUpdate(pvEl);
+        }
+    }
+
+    // --- Home power ---
+    var homeEl = $('homeVal');
+    if (homeEl && s.home_power != null) {
+        var newHomeText = (s.home_power / 1000).toFixed(1) + ' kW';
+        if (homeEl.textContent !== newHomeText) {
+            homeEl.textContent = newHomeText;
+            flashUpdate(homeEl);
+        }
+    }
+
+    // Update age labels immediately after new data arrives
+    updateAgeLabels();
+}
+
+/**
+ * Set SSE connection indicator state.
+ * state: 'connected' | 'error' | 'disconnected'
+ */
+function setSseIndicator(state) {
+    var dot = $('sseDot');
+    var label = $('sseStatus');
+    if (!dot || !label) return;
+    dot.className = 'sse-dot';
+    if (state === 'connected') {
+        dot.classList.add('connected');
+        label.textContent = 'Live';
+        label.style.color = '#00ff88';
+    } else if (state === 'error') {
+        dot.classList.add('error');
+        label.textContent = 'Getrennt';
+        label.style.color = '#ff4444';
+    } else {
+        label.textContent = 'Verbinde...';
+        label.style.color = '#555';
+    }
+}
+
+/**
+ * Start SSE connection to /events.
+ * EventSource reconnects automatically on error; we only update the indicator.
+ */
+function startSSE() {
+    if (_sseSource) {
+        _sseSource.close();
+    }
+    _sseSource = new EventSource('/events');
+
+    _sseSource.onopen = function() {
+        setSseIndicator('connected');
+    };
+
+    _sseSource.onmessage = function(event) {
+        try {
+            var msg = JSON.parse(event.data);
+            applySSEUpdate(msg);
+        } catch(e) {
+            console.warn('SSE parse error:', e);
+        }
+    };
+
+    _sseSource.onerror = function() {
+        setSseIndicator('error');
+        // EventSource will reconnect automatically (browser built-in)
+    };
+}
+
+// =============================================================================
+// Kick off
+// =============================================================================
+
 refresh();
 setInterval(refresh, 60000);
+
+// v6: Start SSE for live updates between polls
+if (typeof EventSource !== 'undefined') {
+    startSSE();
+    // Update age labels every 60 seconds even when no new data arrives
+    setInterval(updateAgeLabels, 60000);
+} else {
+    setSseIndicator('error');
+}
