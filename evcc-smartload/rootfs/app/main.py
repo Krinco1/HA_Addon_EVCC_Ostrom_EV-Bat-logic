@@ -16,6 +16,7 @@ v5 additions (preserved):
 """
 
 import time
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -27,6 +28,8 @@ from evcc_client import EvccClient
 from influxdb_client import InfluxDBClient
 from state import Action, ManualSocStore, SystemState, calc_solar_surplus_kwh, compute_price_percentiles
 from state_store import StateStore
+from forecaster import ConsumptionForecaster, PVForecaster
+from forecaster.ha_energy import run_entity_discovery
 from decision_log import DecisionLog, log_main_cycle
 from optimizer import HolisticOptimizer, EventDetector
 from rl_agent import DQNAgent
@@ -92,6 +95,21 @@ def main():
     evcc = EvccClient(cfg)
     influx = InfluxDBClient(cfg)
     manual_store = ManualSocStore()
+
+    # --- v7: Forecasters (Phase 3) ---
+    consumption_forecaster = ConsumptionForecaster(influx, cfg)
+    pv_forecaster = PVForecaster(evcc)
+
+    # HA entity discovery in daemon thread (non-blocking, per Research Pitfall 3)
+    ha_discovery_result = {"status": "pending"}
+    if getattr(cfg, "ha_url", None) and getattr(cfg, "ha_token", None):
+        def _ha_discover():
+            ha_discovery_result.update(run_entity_discovery(cfg.ha_url, cfg.ha_token))
+        threading.Thread(target=_ha_discover, daemon=True).start()
+
+    # Initial PV forecast fetch before loop starts
+    pv_forecaster.refresh()
+    _last_pv_refresh = time.time()
 
     # --- Energy management ---
     vehicle_monitor = VehicleMonitor(evcc, cfg, manual_store)
@@ -213,6 +231,31 @@ def main():
                     registered_rl_devices.add(vname)
                     registered_rl_lower.add(vname.lower())
 
+            # --- v7: Forecaster updates ---
+            # ConsumptionForecaster: update every cycle (15 min)
+            if state and state.home_power is not None:
+                consumption_forecaster.update(state.home_power, datetime.now(timezone.utc))
+                # Immediate self-correction: compare actual vs forecast for current slot
+                current_forecast = consumption_forecaster.get_forecast_24h()
+                if current_forecast and current_forecast[0] > 100:
+                    consumption_forecaster.apply_correction(state.home_power, current_forecast[0])
+                if not consumption_forecaster.is_ready:
+                    log("info", f"Verbrauchsprognose nicht bereit ({consumption_forecaster.data_days}/1 Tage Daten), verwende Standardwerte")
+
+            # PVForecaster: refresh hourly
+            if time.time() - _last_pv_refresh > 3600:
+                pv_forecaster.refresh()
+                _last_pv_refresh = time.time()
+
+            # PVForecaster: update correction coefficient every cycle
+            if state and state.pv_power is not None:
+                pv_kw = state.pv_power / 1000.0 if state.pv_power > 100 else state.pv_power
+                pv_forecaster.update_correction(pv_kw, datetime.now(timezone.utc))
+
+            # Collect forecast data for StateStore
+            consumption_96 = consumption_forecaster.get_forecast_24h() if consumption_forecaster.is_ready else None
+            pv_96 = pv_forecaster.get_forecast_24h()
+
             events = event_detector.detect(state)
 
             # --- LP decision (production) ---
@@ -278,6 +321,14 @@ def main():
                 lp_action=lp_action,
                 rl_action=rl_action,
                 solar_forecast=solar_forecast,
+                consumption_forecast=consumption_96,
+                pv_forecast=pv_96,
+                pv_confidence=pv_forecaster.confidence,
+                pv_correction_label=pv_forecaster.correction_label,
+                pv_quality_label=pv_forecaster.quality_label,
+                forecaster_ready=consumption_forecaster.is_ready,
+                forecaster_data_days=consumption_forecaster.data_days,
+                ha_warnings=ha_discovery_result.get("warnings", []),
             )
 
             # --- RL learning ---

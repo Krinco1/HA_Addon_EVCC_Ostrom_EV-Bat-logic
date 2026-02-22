@@ -44,6 +44,16 @@ class StateStore:
         self._solar_forecast: List[Dict] = []
         self._last_update: Optional[datetime] = None
 
+        # --- v7: Forecast fields (guarded by _lock) ---
+        self._consumption_forecast: Optional[List[float]] = None
+        self._pv_forecast: Optional[List[float]] = None
+        self._pv_confidence: float = 0.0
+        self._pv_correction_label: str = ""
+        self._pv_quality_label: str = ""
+        self._forecaster_ready: bool = False
+        self._forecaster_data_days: int = 0
+        self._ha_warnings: List[str] = []
+
         # --- SSE client queues (guarded by _sse_lock, separate from _lock) ---
         self._sse_clients: List[queue.Queue] = []
         self._sse_lock = threading.Lock()
@@ -58,6 +68,14 @@ class StateStore:
         lp_action: Optional[Action],
         rl_action: Optional[Action],
         solar_forecast: Optional[List[Dict]] = None,
+        consumption_forecast: Optional[List[float]] = None,
+        pv_forecast: Optional[List[float]] = None,
+        pv_confidence: float = 0.0,
+        pv_correction_label: str = "",
+        pv_quality_label: str = "",
+        forecaster_ready: bool = False,
+        forecaster_data_days: int = 0,
+        ha_warnings: Optional[List[str]] = None,
     ) -> None:
         """Update all state fields atomically under RLock.
 
@@ -70,6 +88,15 @@ class StateStore:
             self._rl_action = rl_action
             self._solar_forecast = list(solar_forecast) if solar_forecast else []
             self._last_update = datetime.now(timezone.utc)
+            # v7: forecast fields
+            self._consumption_forecast = list(consumption_forecast) if consumption_forecast else None
+            self._pv_forecast = list(pv_forecast) if pv_forecast else None
+            self._pv_confidence = pv_confidence
+            self._pv_correction_label = pv_correction_label
+            self._pv_quality_label = pv_quality_label
+            self._forecaster_ready = forecaster_ready
+            self._forecaster_data_days = forecaster_data_days
+            self._ha_warnings = list(ha_warnings) if ha_warnings else []
             # Take snapshot while still holding lock
             snap = self._snapshot_unlocked()
 
@@ -98,6 +125,15 @@ class StateStore:
             "rl_action": copy.copy(self._rl_action),
             "solar_forecast": list(self._solar_forecast),
             "last_update": self._last_update,
+            # v7: forecast fields
+            "consumption_forecast": list(self._consumption_forecast) if self._consumption_forecast else None,
+            "pv_forecast": list(self._pv_forecast) if self._pv_forecast else None,
+            "pv_confidence": self._pv_confidence,
+            "pv_correction_label": self._pv_correction_label,
+            "pv_quality_label": self._pv_quality_label,
+            "forecaster_ready": self._forecaster_ready,
+            "forecaster_data_days": self._forecaster_data_days,
+            "ha_warnings": list(self._ha_warnings) if self._ha_warnings else [],
         }
 
     # ------------------------------------------------------------------
@@ -185,4 +221,15 @@ def _snapshot_to_json_dict(snap: Dict) -> Dict:
             "battery_limit_eur": lp.battery_limit_eur if lp else None,
             "ev_limit_eur": lp.ev_limit_eur if lp else None,
         } if lp else None,
+        # v7: forecast section — enables live chart updates via SSE
+        "forecast": {
+            "consumption_96": snap.get("consumption_forecast"),
+            "pv_96": snap.get("pv_forecast"),
+            "pv_confidence": snap.get("pv_confidence", 0.0),
+            "pv_correction_label": snap.get("pv_correction_label", ""),
+            "pv_quality_label": snap.get("pv_quality_label", ""),
+            "forecaster_ready": snap.get("forecaster_ready", False),
+            "forecaster_data_days": snap.get("forecaster_data_days", 0),
+            "ha_warnings": snap.get("ha_warnings", []),
+        },
     }
