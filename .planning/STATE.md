@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 ## Current Position
 
-Phase: 4.1 of 8 (Deploy Configuration) — Complete
-Plan: 1 of 1 in current phase — complete
-Status: Phase 4.1 complete — gap closure plan done (version 6.0.0, config schema, translations, repository.yaml)
-Last activity: 2026-02-22 — Completed 04.1-01 (version bump, config schema 35 fields, translations, repository metadata)
+Phase: 4.2 of 8 (CI/CD Pipeline) — Complete (automation task done; human-action checkpoint pending: set GHCR packages to Public)
+Plan: 1 of 1 in current phase — automation complete
+Status: Phase 4.2 plan 01 Task 1 complete — GHCR image key added, GitHub Actions workflow created. Paused at Task 2 human-action: set GHCR package visibility to Public after first release push.
+Last activity: 2026-02-22 — Completed 04.2-01 Task 1 (GHCR image key, CI/CD workflow)
 
-Progress: [██████░░░░] 50%
+Progress: [███████░░░] 56%
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: [██████░░░░] 50%
 |-------|-------|-------|----------|
 | Phase 4 | 3 (of 3) | 12 min | 4 min |
 | Phase 04.1-deploy-configuration P01 | 5 | 2 tasks | 5 files |
+| Phase 04.2-ci-cd-pipeline P01 | 1 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,9 @@ Recent decisions affecting current work:
 - [Phase 04.1-01]: Version bumped to 6.0.0 reflecting LP Horizon Planner and PV forecasting capabilities added in Phases 3-4
 - [Phase 04.1-01]: sequencer_enabled uses bare true in options and bool (not bool?) in schema — has explicit default so not optional
 - [Phase 04.1-01]: config.yaml ends up with 35 fields total (original 27 + 8 new LP planner fields) — all 8 correctly added with options/schema/translation parity
+- [Phase 04.2-01]: Pin home-assistant/builder to 2025.09.0 to preserve armv7 + --all flag support (2025.11.0 removed both)
+- [Phase 04.2-01]: GHCR packages default to private — HA Supervisor pulls anonymously; must manually set each arch image to Public after first release push
+- [Phase 04.2-01]: Use GITHUB_TOKEN with packages:write for GHCR push — no PAT required, short-lived and scoped to repository
 
 ### Pending Todos
 
@@ -111,5 +115,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04.1-01-PLAN.md — version 6.0.0, config.yaml 35 fields, translations en+de, repository.yaml channel:stable. Closed DEPLOY-02, DEPLOY-03, DEPLOY-05.
-Next: Phase 5 (Dynamic Buffer Calculation)
+Stopped at: Completed 04.2-01-PLAN.md Task 1 — GHCR image key added to config.yaml, GitHub Actions CI/CD workflow created (.github/workflows/build.yaml). Paused at Task 2 checkpoint:human-action — requires setting GHCR packages to Public after first release push.
+Next: User action required — publish GitHub Release v6.0.0, then set GHCR package visibility to Public for all 3 arch images. After that: Phase 5 (Dynamic Buffer Calculation)
