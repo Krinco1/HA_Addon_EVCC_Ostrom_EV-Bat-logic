@@ -245,6 +245,11 @@ def main():
             # --- v5: Charge Sequencer ---
             now = datetime.now(timezone.utc)
             if sequencer is not None:
+                # Sync current SoC into all active sequencer requests every cycle
+                for vname, vdata in all_vehicles.items():
+                    if vname in sequencer.requests:
+                        sequencer.update_soc(vname, vdata.get_effective_soc())
+
                 connected_vehicle = next(
                     (n for n, v in all_vehicles.items() if v.connected_to_wallbox), None
                 )
