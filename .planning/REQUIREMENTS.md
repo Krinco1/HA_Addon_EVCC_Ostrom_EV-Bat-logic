@@ -75,33 +75,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RELI-01 | — | Pending |
-| RELI-02 | — | Pending |
-| RELI-03 | — | Pending |
-| RELI-04 | — | Pending |
-| RELI-05 | — | Pending |
-| PLAN-01 | — | Pending |
-| PLAN-02 | — | Pending |
-| PLAN-03 | — | Pending |
-| PLAN-04 | — | Pending |
-| PLAN-05 | — | Pending |
-| TRAN-01 | — | Pending |
-| TRAN-02 | — | Pending |
-| TRAN-03 | — | Pending |
-| TRAN-04 | — | Pending |
-| DRIV-01 | — | Pending |
-| DRIV-02 | — | Pending |
-| DRIV-03 | — | Pending |
-| LERN-01 | — | Pending |
-| LERN-02 | — | Pending |
-| LERN-03 | — | Pending |
-| LERN-04 | — | Pending |
+| RELI-01 | Phase 2 | Pending |
+| RELI-02 | Phase 2 | Pending |
+| RELI-03 | Phase 1 | Pending |
+| RELI-04 | Phase 1 | Pending |
+| RELI-05 | Phase 2 | Pending |
+| PLAN-01 | Phase 4 | Pending |
+| PLAN-02 | Phase 4 | Pending |
+| PLAN-03 | Phase 5 | Pending |
+| PLAN-04 | Phase 3 | Pending |
+| PLAN-05 | Phase 3 | Pending |
+| TRAN-01 | Phase 6 | Pending |
+| TRAN-02 | Phase 6 | Pending |
+| TRAN-03 | Phase 8 | Pending |
+| TRAN-04 | Phase 6 | Pending |
+| DRIV-01 | Phase 7 | Pending |
+| DRIV-02 | Phase 7 | Pending |
+| DRIV-03 | Phase 7 | Pending |
+| LERN-01 | Phase 8 | Pending |
+| LERN-02 | Phase 8 | Pending |
+| LERN-03 | Phase 8 | Pending |
+| LERN-04 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 after roadmap creation — all 21 requirements mapped*
