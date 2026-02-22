@@ -79,12 +79,12 @@ Plans:
   3. When real-world conditions diverge mid-cycle (price spike, unexpected cloud cover), the next cycle's plan reflects the updated inputs — old plans are never cached for re-use
   4. If the LP solver fails or times out, the system falls back to the existing holistic optimizer and logs a warning — the add-on never crashes due to a planner failure
   5. A per-EV departure time (from config or driver input) is factored into the plan so urgency windows are sized correctly: a vehicle departing in 2h gets priority over one departing in 12h
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Implement HorizonPlanner: scipy linprog LP formulation for joint battery + EV 96-slot scheduling; rolling-horizon MPC loop; fallback to holistic optimizer on failure
-- [ ] 04-02: Integrate departure times into LP formulation; replace static euro price limit config paths with planner output; update StateStore.update_plan()
-- [ ] 04-03: End-to-end integration test: inject price spike mid-sequence, confirm next cycle plan updates; confirm fallback activates on deliberate solver failure
+- [ ] 04-01-PLAN.md — Core LP engine: scipy/HiGHS LP formulation, PlanHorizon/DispatchSlot dataclasses, HorizonPlanner with 96-slot joint battery+EV optimization
+- [ ] 04-02-PLAN.md — Main loop integration: wire HorizonPlanner into decision loop, replace static price limit gating with LP-derived actions, StateStore plan storage, departure time resolution
+- [ ] 04-03-PLAN.md — Integration tests (TDD): verify price-responsive behavior, solver failure fallback, no-EV case, departure urgency, SoC bounds compliance
 
 ### Phase 5: Dynamic Buffer
 **Goal**: The battery minimum SoC adapts situationally — higher when PV forecast confidence is low or prices are flat, lower when cheap solar is reliably incoming
