@@ -22,6 +22,7 @@ from typing import Optional
 from version import VERSION
 from logging_util import log
 from config import load_config
+from config_validator import ConfigValidator
 from evcc_client import EvccClient
 from influxdb_client import InfluxDBClient
 from state import Action, ManualSocStore, SystemState, calc_solar_surplus_kwh, compute_price_percentiles
@@ -45,15 +46,52 @@ def main():
 
     cfg = load_config()
     log("info", f"Config: battery_max={cfg.battery_max_price_ct}ct, ev_max={cfg.ev_max_price_ct}ct, "
-                f"quiet={cfg.quiet_hours_start}:00–{cfg.quiet_hours_end}:00, rl_auto={cfg.rl_auto_switch}")
+                f"quiet={cfg.quiet_hours_start}:00\u2013{cfg.quiet_hours_end}:00, rl_auto={cfg.rl_auto_switch}")
 
-    # --- Core infrastructure ---
-    evcc = EvccClient(cfg)
-    influx = InfluxDBClient(cfg)
-    manual_store = ManualSocStore()
+    # --- v6.1: Config validation — runs before any I/O (fail-fast) ---
+    validator = ConfigValidator()
+    config_errors = validator.validate(cfg)
+    critical = [e for e in config_errors if e.severity == "critical"]
+
+    for e in config_errors:
+        level = "error" if e.severity == "critical" else "warning"
+        log(level, f"Config {e.field}: {e.message}")
+        if e.suggestion:
+            log(level, f"  -> {e.suggestion}")
+
+    # Apply safe defaults for non-critical warnings before starting I/O
+    for e in config_errors:
+        if e.severity == "warning":
+            if e.field == "battery_max_price_ct":
+                log("warning", f"Setze battery_max_price_ct auf 25.0ct (war: {cfg.battery_max_price_ct})")
+                cfg.battery_max_price_ct = 25.0
+            elif e.field == "ev_max_price_ct":
+                log("warning", f"Setze ev_max_price_ct auf 30.0ct (war: {cfg.ev_max_price_ct})")
+                cfg.ev_max_price_ct = 30.0
+            elif e.field == "decision_interval_minutes":
+                log("warning", f"Setze decision_interval_minutes auf 15 (war: {cfg.decision_interval_minutes})")
+                cfg.decision_interval_minutes = 15
 
     # --- v6: StateStore — single source of truth for shared state ---
     store = StateStore()
+
+    # --- v6.1: Start WebServer early so error page is reachable even on critical errors ---
+    # WebServer is created with config_errors and started before any I/O objects are built.
+    # If critical errors exist, we block here; the web server stays alive serving the error page.
+    # If no critical errors, we populate the remaining attributes below before the main loop.
+    web = WebServer(cfg, store, config_errors=config_errors)
+    web.start()
+
+    if critical:
+        log("error", f"Kritische Config-Fehler ({len(critical)} Fehler) - Add-on startet nicht. Bitte options.json pruefen.")
+        log("error", "Fehlerseite erreichbar unter http://localhost:8099")
+        while True:
+            time.sleep(60)
+
+    # --- Core infrastructure (only reached if no critical config errors) ---
+    evcc = EvccClient(cfg)
+    influx = InfluxDBClient(cfg)
+    manual_store = ManualSocStore()
 
     # --- Energy management ---
     vehicle_monitor = VehicleMonitor(evcc, cfg, manual_store)
@@ -110,16 +148,21 @@ def main():
 
     decision_log = DecisionLog(max_entries=100)
 
-    # --- v6: Pass StateStore to WebServer (read-only consumer) ---
-    web = WebServer(
-        cfg, store, optimizer, rl_agent, comparator, event_detector,
-        collector, vehicle_monitor, rl_devices, manual_store,
-        decision_log=decision_log,
-        sequencer=sequencer,
-        driver_mgr=driver_mgr,
-        notifier=notifier,
-    )
-    web.start()
+    # --- v6: Populate WebServer with all components (server already started above) ---
+    # The server was started early to serve the error page; now we attach all components
+    # so API handlers have access to the optimizer, RL agent, comparator, etc.
+    web.lp = optimizer
+    web.rl = rl_agent
+    web.comparator = comparator
+    web.events = event_detector
+    web.collector = collector
+    web.vehicle_monitor = vehicle_monitor
+    web.rl_devices = rl_devices
+    web.manual_store = manual_store
+    web.decision_log = decision_log
+    web.sequencer = sequencer
+    web.driver_mgr = driver_mgr
+    web.notifier = notifier
 
     # --- Main decision loop ---
     last_state: Optional[SystemState] = None

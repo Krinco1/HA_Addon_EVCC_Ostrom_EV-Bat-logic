@@ -53,11 +53,13 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
 class WebServer:
     """Wraps the HTTP server. Read-only consumer of StateStore."""
 
-    def __init__(self, cfg: Config, store: StateStore, optimizer, rl_agent,
-                 comparator, event_detector, collector, vehicle_monitor,
-                 rl_devices, manual_store: ManualSocStore, decision_log=None,
+    def __init__(self, cfg: Config, store: StateStore, optimizer=None, rl_agent=None,
+                 comparator=None, event_detector=None, collector=None, vehicle_monitor=None,
+                 rl_devices=None, manual_store: ManualSocStore = None, decision_log=None,
                  # v5 optional
-                 sequencer=None, driver_mgr=None, notifier=None):
+                 sequencer=None, driver_mgr=None, notifier=None,
+                 # v6.1: config validation errors
+                 config_errors: List = None):
         self.cfg = cfg
         self._store = store
         self.lp = optimizer
@@ -73,10 +75,42 @@ class WebServer:
         self.sequencer = sequencer
         self.driver_mgr = driver_mgr
         self.notifier = notifier
+        # v6.1: config errors (may be set before optimizer/RL objects are created)
+        self._config_errors = config_errors or []
 
     # ------------------------------------------------------------------
     # Start
     # ------------------------------------------------------------------
+
+    def _render_error_page(self) -> str:
+        """Build the error.html HTML with config_errors substituted."""
+        errors = self._config_errors
+        cards_html = []
+        for e in errors:
+            sev_class = "critical" if e.severity == "critical" else "warning"
+            badge_label = "Kritisch" if e.severity == "critical" else "Warnung"
+            suggestion_html = (
+                f'<div class="error-suggestion">{e.suggestion}</div>'
+                if e.suggestion else ""
+            )
+            cards_html.append(
+                f'<div class="error-card {sev_class}">'
+                f'<div class="error-card-header">'
+                f'<span class="error-field">{e.field}</span>'
+                f'<span class="severity-badge {sev_class}">{badge_label}</span>'
+                f'</div>'
+                f'<div class="error-value">'
+                f'<span class="label">Wert:</span>{e.value}'
+                f'</div>'
+                f'<div class="error-message">{e.message}</div>'
+                f'{suggestion_html}'
+                f'</div>'
+            )
+        context = {
+            "error_count": str(len(errors)),
+            "error_cards": "\n".join(cards_html),
+        }
+        return render_template("error.html", context)
 
     def start(self):
         srv = self
@@ -99,6 +133,33 @@ class WebServer:
 
             def do_GET(self):
                 path = self.path.split("?")[0]
+
+                # v6.1: Config error guard — serve error page when critical errors exist
+                config_errors = getattr(self.server, "_config_errors", [])
+                if config_errors and any(e.severity == "critical" for e in config_errors):
+                    if path in ("/", ""):
+                        self._html(srv._render_error_page(), 503)
+                        return
+                    elif path == "/status":
+                        self._json({
+                            "error": "Add-on nicht gestartet - Konfigurationsfehler",
+                            "details": [
+                                {
+                                    "field": e.field,
+                                    "message": e.message,
+                                    "severity": e.severity,
+                                }
+                                for e in config_errors
+                            ],
+                        }, 503)
+                        return
+                    elif path.startswith("/static/"):
+                        pass  # Allow static files so error page can load CSS/JS
+                    elif path == "/health":
+                        pass  # Allow health check always
+                    else:
+                        self._json({"error": "Add-on nicht gestartet - Konfigurationsfehler"}, 503)
+                        return
 
                 if path == "/":
                     self._html(render_template("dashboard.html", {"version": VERSION}))
@@ -269,6 +330,8 @@ class WebServer:
             server = ThreadedHTTPServer(("0.0.0.0", self.cfg.api_port), Handler)
             # Attach store reference to server so Handler can access it via self.server._store
             server._store = self._store
+            # Attach config errors so Handler can guard routes during error state
+            server._config_errors = self._config_errors
             log("info", f"API server running on port {self.cfg.api_port} (threaded, SSE enabled)")
             server.serve_forever()
 

@@ -150,7 +150,14 @@ def _load_vehicle_providers() -> List[Dict]:
 
 
 def load_config() -> Config:
-    """Load configuration from Home Assistant options.json, falling back to defaults."""
+    """Load configuration from Home Assistant options.json, falling back to defaults.
+
+    NOTE: Range validation is NOT performed here. load_config() provides type coercion
+    and structural loading only. Range checking and severity classification are handled
+    by ConfigValidator in config_validator.py, called from main.py immediately after
+    load_config(). The caller (main.py) is responsible for applying safe defaults for
+    non-critical warnings and blocking on critical errors.
+    """
     try:
         with open(OPTIONS_PATH, "r") as f:
             raw = json.load(f)
