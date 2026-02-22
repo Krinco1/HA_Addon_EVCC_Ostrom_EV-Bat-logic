@@ -129,7 +129,8 @@ def main():
 
     # --- RL bootstrap ---
     if not rl_agent.load():
-        bootstrapped = rl_agent.bootstrap_from_influxdb(influx, hours=168)
+        max_rec = getattr(cfg, "rl_bootstrap_max_records", 1000)
+        bootstrapped = rl_agent.bootstrap_from_influxdb(influx, hours=168, max_records=max_rec)
         if bootstrapped:
             rl_agent.save()
             comparator.seed_from_bootstrap(bootstrapped)

@@ -86,6 +86,7 @@ class Config:
     rl_ready_min_comparisons: int = 200
     rl_auto_switch: bool = True
     rl_fallback_threshold: float = 0.7
+    rl_bootstrap_max_records: int = 1000
 
     # --- Vehicle providers (loaded from vehicles.yaml) ---
     vehicle_poll_interval_minutes: int = 60
