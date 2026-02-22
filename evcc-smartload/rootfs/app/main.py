@@ -17,8 +17,8 @@ v5 additions (preserved):
 
 import time
 import threading
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Optional
 
 from version import VERSION
 from logging_util import log
@@ -32,6 +32,7 @@ from forecaster import ConsumptionForecaster, PVForecaster
 from forecaster.ha_energy import run_entity_discovery
 from decision_log import DecisionLog, log_main_cycle
 from optimizer import HolisticOptimizer, EventDetector
+from optimizer.planner import HorizonPlanner
 from rl_agent import DQNAgent
 from comparator import Comparator, RLDeviceController
 from controller import Controller
@@ -115,6 +116,17 @@ def main():
     vehicle_monitor = VehicleMonitor(evcc, cfg, manual_store)
     collector = DataCollector(evcc, influx, cfg, vehicle_monitor)
     optimizer = HolisticOptimizer(cfg)
+
+    # --- Phase 4: HorizonPlanner (LP-based, graceful fallback if scipy unavailable) ---
+    horizon_planner = None
+    try:
+        horizon_planner = HorizonPlanner(cfg)
+        log("info", "HorizonPlanner: initialized (scipy/HiGHS LP solver)")
+    except ImportError as e:
+        log("warning", f"HorizonPlanner: scipy not available ({e}), using HolisticOptimizer only")
+    except Exception as e:
+        log("warning", f"HorizonPlanner: init failed ({e}), using HolisticOptimizer only")
+
     rl_agent = DQNAgent(cfg)
     event_detector = EventDetector()
     comparator = Comparator(cfg)
@@ -258,8 +270,27 @@ def main():
 
             events = event_detector.detect(state)
 
-            # --- LP decision (production) ---
-            lp_action = optimizer.optimize(state, tariffs)
+            # --- Phase 4: Predictive Planner (LP-based) ---
+            plan = None
+            if horizon_planner is not None and consumption_96 is not None and pv_96 is not None:
+                plan = horizon_planner.plan(
+                    state=state,
+                    tariffs=tariffs,
+                    consumption_96=consumption_96,
+                    pv_96=pv_96,
+                    ev_departure_times=_get_departure_times(cfg),
+                )
+
+            if plan is not None:
+                lp_action = _action_from_plan(plan, state)
+                store.update_plan(plan)
+                log("info", f"Decision: LP plan (cost={plan.solver_fun:.4f} EUR), "
+                             f"bat={'charge' if plan.current_bat_charge else 'discharge' if plan.current_bat_discharge else 'hold'}, "
+                             f"ev={'charge' if plan.current_ev_charge else 'off'}")
+            else:
+                # Fallback: holistic optimizer (unchanged from Phase 3)
+                lp_action = optimizer.optimize(state, tariffs)
+                log("info", "Decision: HolisticOptimizer fallback")
 
             # --- RL decision (shadow) ---
             rl_action = rl_agent.select_action(state, explore=True)
@@ -381,6 +412,60 @@ def main():
 # =============================================================================
 # Helpers
 # =============================================================================
+
+def _get_departure_times(cfg) -> Dict[str, datetime]:
+    """Return departure datetime per EV name for LP formulation.
+
+    Phase 4: uses cfg.ev_charge_deadline_hour as the single deadline.
+    Phase 7 will extend with per-driver Telegram input.
+    """
+    now = datetime.now(timezone.utc)
+    deadline_hour = getattr(cfg, 'ev_charge_deadline_hour', 6)
+    local_deadline = now.replace(hour=deadline_hour, minute=0, second=0, microsecond=0)
+    if local_deadline <= now:
+        local_deadline += timedelta(days=1)
+    return {"_default": local_deadline}
+
+
+def _action_from_plan(plan, state) -> "Action":
+    """Convert LP PlanHorizon slot-0 decision to an Action for the controller.
+
+    Maps continuous LP power values to discrete Action codes:
+    - Battery: charge (1) / discharge (6) / hold (0)
+    - EV: charge (1) / off (0)
+
+    The slot-0 price_eur_kwh is used as the battery/ev price limit so the
+    controller applies the correct evcc charge mode.
+    """
+    from state import Action
+    slot0 = plan.slots[0]
+
+    # Battery action
+    if slot0.bat_charge_kw > 0.1:
+        battery_action = 1  # charge (price-limited)
+        battery_limit_eur = slot0.price_eur_kwh
+    elif slot0.bat_discharge_kw > 0.1:
+        battery_action = 6  # discharge
+        battery_limit_eur = None
+    else:
+        battery_action = 0  # hold
+        battery_limit_eur = None
+
+    # EV action
+    if slot0.ev_charge_kw > 0.1 and state.ev_connected:
+        ev_action = 1  # charge (price-limited)
+        ev_limit_eur = slot0.price_eur_kwh
+    else:
+        ev_action = 0  # off
+        ev_limit_eur = None
+
+    return Action(
+        battery_action=battery_action,
+        battery_limit_eur=battery_limit_eur,
+        ev_action=ev_action,
+        ev_limit_eur=ev_limit_eur,
+    )
+
 
 def _run_bat_to_ev(cfg, state, controller, all_vehicles, tariffs, solar_forecast, any_ev_connected):
     """Battery-to-EV discharge optimisation (unchanged logic from v4)."""
