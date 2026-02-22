@@ -24,7 +24,8 @@ def _make_provider(config: dict):
         return RenaultProvider(config)
     elif ptype == "custom":
         return CustomProvider(config)
-    elif ptype == "evcc":
+    elif ptype in ("evcc", "manual"):
+        # "manual" = SoC via dashboard manual input or evcc wallbox only
         return EvccProvider(config)
     else:
         log("warning", f"Unknown provider type '{ptype}' for {config.get('name', '?')} — using evcc fallback")
@@ -86,27 +87,40 @@ class VehicleManager:
         """Update vehicle connectivity and SoC from evcc loadpoint state."""
         loadpoints = evcc_state.get("loadpoints", [])
 
-        # Mark all disconnected first
+        if not loadpoints:
+            log("debug", "evcc: no loadpoints in state response")
+
+        # Mark all disconnected first — preserve last_poll and API soc
         for v in self._vehicle_data.values():
             v.connected_to_wallbox = False
             v.charging = False
 
-        for lp in loadpoints:
+        for i, lp in enumerate(loadpoints):
             vehicle_name = lp.get("vehicleName") or lp.get("vehicle", "")
+            connected = lp.get("connected", False)
+            charging = lp.get("charging", False)
+            evcc_soc = lp.get("vehicleSoc")
+
+            if connected and vehicle_name:
+                log("info", f"evcc LP{i}: {vehicle_name} connected={connected} "
+                            f"charging={charging} soc={evcc_soc}")
+
             if not vehicle_name:
                 continue
 
             # Case-insensitive match
             matched = self._match_vehicle(vehicle_name)
             if matched is None:
+                if connected:
+                    log("warning", f"evcc LP{i}: vehicle '{vehicle_name}' not in config "
+                                   f"(configured: {list(self._vehicle_data.keys())})")
                 continue
 
             vd = self._vehicle_data[matched]
-            vd.connected_to_wallbox = lp.get("connected", False)
-            vd.charging = lp.get("charging", False)
+            vd.connected_to_wallbox = connected
+            vd.charging = charging
 
             # SoC from evcc (only when connected)
-            evcc_soc = lp.get("vehicleSoc")
             if evcc_soc is not None and vd.connected_to_wallbox:
                 vd.update_from_evcc(float(evcc_soc), vd.connected_to_wallbox, vd.charging)
 

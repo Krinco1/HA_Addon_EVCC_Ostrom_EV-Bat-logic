@@ -94,7 +94,7 @@ class KiaProvider:
                 provider_type="kia",
             )
             v.update_from_api(float(soc), range_km=float(range_km) if range_km else None)
-            log("debug", f"KiaProvider {self.evcc_name}: SoC={soc}% range={range_km}km")
+            log("info", f"KiaProvider {self.evcc_name}: SoC={soc}% range={range_km}km")
             return v
 
         except ImportError:

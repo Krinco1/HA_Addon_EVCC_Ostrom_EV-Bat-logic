@@ -39,6 +39,30 @@ class VehicleMonitor:
 
     def start_polling(self):
         """Start background vehicle polling thread."""
+        # Do first poll synchronously so errors are visible at startup
+        pollable = self._manager.get_pollable_names()
+        if pollable:
+            log("info", f"VehicleMonitor: initial poll for {len(pollable)} vehicle(s): {pollable}")
+            for name in pollable:
+                try:
+                    log("info", f"VehicleMonitor: polling {name}...")
+                    result = self._manager.poll_vehicle(name)
+                    self._last_poll[name] = time.time()
+                    vdata = self._manager.get_vehicle(name)
+                    if vdata:
+                        vdata.last_poll = datetime.now(timezone.utc)
+                    if result:
+                        manual = self.manual_store.get(name)
+                        if manual is not None:
+                            result.manual_soc = manual
+                        log("info", f"VehicleMonitor: {name} SoC={result.get_effective_soc():.1f}% (source={result.data_source})")
+                    else:
+                        log("warning", f"VehicleMonitor: {name} initial poll returned no data")
+                except Exception as e:
+                    log("error", f"VehicleMonitor: {name} initial poll failed: {e}")
+        else:
+            log("info", "VehicleMonitor: no vehicles with active API polling configured")
+
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
         log("info", f"VehicleMonitor: polling every {self.cfg.vehicle_poll_interval_minutes}min")
@@ -163,7 +187,21 @@ class DataCollector:
         # Fetch evcc state
         evcc_state = self.evcc.get_state()
         if not evcc_state:
+            log("warning", "DataCollector: evcc.get_state() returned None — evcc unreachable?")
             return
+
+        # Log evcc loadpoint summary on first successful collect
+        if self._state is None:
+            site_preview = evcc_state.get("result", evcc_state)
+            lps = site_preview.get("loadpoints", [])
+            log("info", f"evcc: {len(lps)} loadpoint(s), "
+                        f"batterySoc={site_preview.get('batterySoc')}%, "
+                        f"pvPower={site_preview.get('pvPower')}W, "
+                        f"gridPower={site_preview.get('gridPower')}W")
+            for i, lp in enumerate(lps):
+                vn = lp.get("vehicleName") or lp.get("vehicle", "—")
+                log("info", f"  evcc LP{i}: vehicle={vn} connected={lp.get('connected')} "
+                            f"charging={lp.get('charging')} soc={lp.get('vehicleSoc')}")
 
         # Update vehicle monitor with evcc state
         self.vehicle_monitor.update_from_evcc(evcc_state)

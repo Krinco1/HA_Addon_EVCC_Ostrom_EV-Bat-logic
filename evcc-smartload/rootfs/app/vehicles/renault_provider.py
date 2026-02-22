@@ -80,7 +80,7 @@ class RenaultProvider:
                     provider_type="renault",
                 )
                 v.update_from_api(float(soc))
-                log("debug", f"RenaultProvider {self.evcc_name}: SoC={soc}%")
+                log("info", f"RenaultProvider {self.evcc_name}: SoC={soc}%")
                 return v
 
         except ImportError:
