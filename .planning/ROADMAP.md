@@ -163,7 +163,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 1. State Infrastructure | 2/2 | Complete    | 2026-02-22 |
 | 2. Vehicle Reliability | 2/2 | Complete    | 2026-02-22 |
 | 3. Data Foundation | 3/3 | Complete   | 2026-02-22 |
-| 4. Predictive Planner | 1/3 | In Progress|  |
+| 4. Predictive Planner | 2/3 | In Progress|  |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
 | 7. Driver Interaction | 0/3 | Not started | - |

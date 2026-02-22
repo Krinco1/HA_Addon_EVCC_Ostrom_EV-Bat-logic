@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 4 of 8 (Predictive Planner) — In Progress
-Plan: 1 of 3 in current phase — complete
-Status: In Progress — 04-01 complete, 04-02 next
-Last activity: 2026-02-22 — Completed 04-01 (HorizonPlanner LP engine with scipy/HiGHS)
+Plan: 2 of 3 in current phase — complete
+Status: In Progress — 04-02 complete, 04-03 next
+Last activity: 2026-02-22 — Completed 04-02 (HorizonPlanner main loop integration, StateStore plan storage)
 
-Progress: [█████░░░░░] 43%
+Progress: [█████░░░░░] 46%
 
 ## Performance Metrics
 
@@ -39,7 +39,7 @@ Progress: [█████░░░░░] 43%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| Phase 4 | 1 (of 3) | 4 min | 4 min |
+| Phase 4 | 2 (of 3) | 7 min | 3.5 min |
 
 ## Accumulated Context
 
@@ -85,6 +85,9 @@ Recent decisions affecting current work:
 - [Phase 04-01]: PV surplus reduces effective LP objective price coefficient proportionally (Pitfall 3 mitigation)
 - [Phase 04-01]: Mutual exclusion guard bat_charge+bat_discharge<=P_max prevents LP degeneracy at unit efficiency
 - [Phase 04-01]: Config max-price (ev_max_price_ct/battery_max_price_ct) enforced as 10x LP objective penalty, not hard bound
+- [04-02]: _action_from_plan uses slot-0 price_eur_kwh as battery/ev limit_eur — controller applies correct evcc charge mode without additional price-gate logic in main loop
+- [04-02]: update_plan() does not broadcast SSE — plan data included in next regular update() call to avoid double broadcast and race conditions
+- [04-02]: _snapshot_unlocked includes _plan reference (private key) passed to _snapshot_to_json_dict — avoids acquiring lock twice for plan_summary serialization
 
 ### Pending Todos
 
@@ -101,5 +104,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-01-PLAN.md — HorizonPlanner LP engine with scipy/HiGHS; PlanHorizon/DispatchSlot dataclasses
-Next: Phase 4 (Predictive Planner) — 04-02-PLAN.md (main loop integration)
+Stopped at: Completed 04-02-PLAN.md — HorizonPlanner main loop integration, StateStore plan storage, _action_from_plan/_get_departure_times helpers
+Next: Phase 4 (Predictive Planner) — 04-03-PLAN.md (final plan in phase)
