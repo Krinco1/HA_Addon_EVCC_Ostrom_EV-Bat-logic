@@ -7,6 +7,7 @@ arch:
   - aarch64
   - amd64
   - armv7
+image: "ghcr.io/krinco1/ha_addon_evcc-smartload-{arch}"
 init: false
 startup: application
 boot: auto
