@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 1 of 8 (State Infrastructure)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-02-22 — Roadmap created; all 21 v1 requirements mapped across 8 phases
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-22 — Completed plan 01-01: StateStore + SSE live dashboard
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 6%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: — min
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 8 min
+- Total execution time: 0.1 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| Phase 1 | 1 | 8 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: —
+- Last 5 plans: 8 min
 - Trend: —
 
 *Updated after each plan completion*
@@ -48,6 +48,10 @@ Recent decisions affecting current work:
 - [Research]: DynamicBufferCalc runs in observation mode first 2 weeks before going live — coefficients need empirical tuning
 - [Research]: SeasonalLearner deployed at Phase 8 start (not end) — needs months of data accumulation, earlier is better
 - [Research]: PV forecast comes from evcc solar tariff API (price signal), not kWh — planner must handle partial forecasts with confidence reduction
+- [01-01]: RLock (not Lock) guards StateStore to prevent deadlock if nested calls occur
+- [01-01]: SSE broadcast happens outside the RLock to avoid I/O while holding the state lock
+- [01-01]: ThreadedHTTPServer with daemon_threads=True enables concurrent SSE + API requests without blocking
+- [01-01]: Existing 60s polling preserved in app.js as fallback; SSE is an enhancement layer
 
 ### Pending Todos
 
@@ -64,5 +68,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-state-infrastructure/01-CONTEXT.md
+Stopped at: Completed 01-01-PLAN.md — StateStore + SSE implementation done
+Resume file: .planning/phases/01-state-infrastructure/01-02-PLAN.md

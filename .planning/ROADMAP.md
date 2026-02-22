@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Thread-safe StateStore with RLock, SSE push, and web server migration to read-only
+- [x] 01-01-PLAN.md — Thread-safe StateStore with RLock, SSE push, and web server migration to read-only
 - [ ] 01-02-PLAN.md — Config validation with critical/non-critical classification and startup error page
 
 ### Phase 2: Vehicle Reliability
