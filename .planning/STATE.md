@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 4 — Predictive Planner
+**Current focus:** Phase 5 — Dynamic Buffer Calculation (next phase)
 
 ## Current Position
 
-Phase: 4 of 8 (Predictive Planner) — In Progress
-Plan: 2 of 3 in current phase — complete
-Status: In Progress — 04-02 complete, 04-03 next
-Last activity: 2026-02-22 — Completed 04-02 (HorizonPlanner main loop integration, StateStore plan storage)
+Phase: 4 of 8 (Predictive Planner) — Complete
+Plan: 3 of 3 in current phase — complete
+Status: Phase 4 complete — all 3 plans done (LP engine, main loop integration, integration tests)
+Last activity: 2026-02-22 — Completed 04-03 (HorizonPlanner integration test suite, 14 test methods)
 
-Progress: [█████░░░░░] 46%
+Progress: [██████░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 3 min
-- Total execution time: 0.3 hours
+- Total plans completed: 7
+- Average duration: 3.4 min
+- Total execution time: 0.4 hours
 
 **By Phase:**
 
@@ -32,14 +32,14 @@ Progress: [█████░░░░░] 46%
 | Phase 3 | 3 (of 3) | 7 min | 2.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 8 min, 4 min, 2 min, 5 min, 2 min
-- Trend: improving
+- Last 5 plans: 4 min, 2 min, 5 min, 2 min, 5 min
+- Trend: stable ~3-5 min per plan
 
 *Updated after each plan completion*
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| Phase 4 | 2 (of 3) | 7 min | 3.5 min |
+| Phase 4 | 3 (of 3) | 12 min | 4 min |
 
 ## Accumulated Context
 
@@ -88,6 +88,9 @@ Recent decisions affecting current work:
 - [04-02]: _action_from_plan uses slot-0 price_eur_kwh as battery/ev limit_eur — controller applies correct evcc charge mode without additional price-gate logic in main loop
 - [04-02]: update_plan() does not broadcast SSE — plan data included in next regular update() call to avoid double broadcast and race conditions
 - [04-02]: _snapshot_unlocked includes _plan reference (private key) passed to _snapshot_to_json_dict — avoids acquiring lock twice for plan_summary serialization
+- [04-03]: sys.modules.setdefault() patches logging_util/config before planner import — prevents real file system access during tests without requiring mocking framework
+- [04-03]: battery_min_soc > battery_max_soc (90 > 10) is the reliable LP infeasibility trigger — HiGHS returns status=2, planner returns None
+- [04-03]: test_infeasible_ev_impossible_deadline uses try/except wrapper to assert no exception raised — both None and valid plan are acceptable LP outcomes
 
 ### Pending Todos
 
@@ -104,5 +107,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-02-PLAN.md — HorizonPlanner main loop integration, StateStore plan storage, _action_from_plan/_get_departure_times helpers
-Next: Phase 4 (Predictive Planner) — 04-03-PLAN.md (final plan in phase)
+Stopped at: Completed 04-03-PLAN.md — HorizonPlanner integration test suite (14 tests, test_planner.py, 617 lines)
+Next: Phase 5 (Dynamic Buffer Calculation)

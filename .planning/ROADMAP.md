@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: State Infrastructure** - Thread-safe StateStore and startup config validation eliminate race conditions and misconfiguration crashes
 - [x] **Phase 2: Vehicle Reliability** - Accurate live vehicle SoC, immediate charge sequencer transitions, and bounded RL bootstrap memory
 - [x] **Phase 3: Data Foundation** - Consumption history forecasting from HA/InfluxDB and PV generation estimates from evcc solar tariff integrated into planning inputs (completed 2026-02-22)
-- [ ] **Phase 4: Predictive Planner** - Rolling-horizon 24-48h LP optimizer replaces static euro price limits with joint battery and EV dispatch planning
+- [x] **Phase 4: Predictive Planner** - Rolling-horizon 24-48h LP optimizer replaces static euro price limits with joint battery and EV dispatch planning (completed 2026-02-22)
 - [ ] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day
 - [ ] **Phase 6: Decision Transparency** - Dashboard shows 24-48h plan timeline, per-slot decision explanations, and planned-vs-actual historical comparison
 - [ ] **Phase 7: Driver Interaction** - Manual override from dashboard and Telegram, proactive departure-time queries, and driver-context-aware multi-EV prioritization
@@ -82,9 +82,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Core LP engine: scipy/HiGHS LP formulation, PlanHorizon/DispatchSlot dataclasses, HorizonPlanner with 96-slot joint battery+EV optimization
-- [ ] 04-02-PLAN.md — Main loop integration: wire HorizonPlanner into decision loop, replace static price limit gating with LP-derived actions, StateStore plan storage, departure time resolution
-- [ ] 04-03-PLAN.md — Integration tests (TDD): verify price-responsive behavior, solver failure fallback, no-EV case, departure urgency, SoC bounds compliance
+- [x] 04-01-PLAN.md — Core LP engine: scipy/HiGHS LP formulation, PlanHorizon/DispatchSlot dataclasses, HorizonPlanner with 96-slot joint battery+EV optimization
+- [x] 04-02-PLAN.md — Main loop integration: wire HorizonPlanner into decision loop, replace static price limit gating with LP-derived actions, StateStore plan storage, departure time resolution
+- [x] 04-03-PLAN.md — Integration tests (TDD): verify price-responsive behavior, solver failure fallback, no-EV case, departure urgency, SoC bounds compliance
 
 ### Phase 5: Dynamic Buffer
 **Goal**: The battery minimum SoC adapts situationally — higher when PV forecast confidence is low or prices are flat, lower when cheap solar is reliably incoming
@@ -163,7 +163,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 1. State Infrastructure | 2/2 | Complete    | 2026-02-22 |
 | 2. Vehicle Reliability | 2/2 | Complete    | 2026-02-22 |
 | 3. Data Foundation | 3/3 | Complete   | 2026-02-22 |
-| 4. Predictive Planner | 2/3 | In Progress|  |
+| 4. Predictive Planner | 3/3 | Complete    | 2026-02-22 |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
 | 7. Driver Interaction | 0/3 | Not started | - |
