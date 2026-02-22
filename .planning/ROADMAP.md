@@ -16,6 +16,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Vehicle Reliability** - Accurate live vehicle SoC, immediate charge sequencer transitions, and bounded RL bootstrap memory
 - [x] **Phase 3: Data Foundation** - Consumption history forecasting from HA/InfluxDB and PV generation estimates from evcc solar tariff integrated into planning inputs (completed 2026-02-22)
 - [x] **Phase 4: Predictive Planner** - Rolling-horizon 24-48h LP optimizer replaces static euro price limits with joint battery and EV dispatch planning (completed 2026-02-22)
+- [ ] **Phase 4.1: Deploy Configuration** - Version bump to 6.0.0, config.yaml schema completion, repository.yaml channel field (INSERTED — gap closure)
+- [ ] **Phase 4.2: CI/CD Pipeline** - GitHub Actions multi-arch container build and push to GHCR (INSERTED — gap closure)
+- [ ] **Phase 4.3: Release Documentation** - CHANGELOG.md and README.md updated for Phases 1-4 features (INSERTED — gap closure)
 - [ ] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day
 - [ ] **Phase 6: Decision Transparency** - Dashboard shows 24-48h plan timeline, per-slot decision explanations, and planned-vs-actual historical comparison
 - [ ] **Phase 7: Driver Interaction** - Manual override from dashboard and Telegram, proactive departure-time queries, and driver-context-aware multi-EV prioritization
@@ -85,6 +88,45 @@ Plans:
 - [x] 04-01-PLAN.md — Core LP engine: scipy/HiGHS LP formulation, PlanHorizon/DispatchSlot dataclasses, HorizonPlanner with 96-slot joint battery+EV optimization
 - [x] 04-02-PLAN.md — Main loop integration: wire HorizonPlanner into decision loop, replace static price limit gating with LP-derived actions, StateStore plan storage, departure time resolution
 - [x] 04-03-PLAN.md — Integration tests (TDD): verify price-responsive behavior, solver failure fallback, no-EV case, departure urgency, SoC bounds compliance
+
+### Phase 4.1: Deploy Configuration (INSERTED — Gap Closure)
+**Goal**: Version, config schema, and repository metadata are correct and complete for HA add-on deployment
+**Depends on**: Phase 4
+**Gap Closure**: Closes DEPLOY-02, DEPLOY-03, DEPLOY-05 from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `version.py` and `config.yaml` both declare version `6.0.0`
+  2. All LP planner config fields (battery_charge_power_kw, battery_min/max_soc, feed_in_tariff_ct, ev_default_energy_kwh, sequencer_enabled, sequencer_default_charge_power_kw, rl_bootstrap_max_records) are exposed in config.yaml options and schema sections
+  3. `repository.yaml` includes `channel: stable`
+**Plans**: TBD
+
+Plans:
+- [ ] 04.1-01-PLAN.md — Version bump, config schema completion, repository.yaml update
+
+### Phase 4.2: CI/CD Pipeline (INSERTED — Gap Closure)
+**Goal**: HA OS devices can install the add-on from a pre-built container image pulled from GHCR
+**Depends on**: Phase 4.1
+**Gap Closure**: Closes DEPLOY-01 (BLOCKER) from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `config.yaml` has an `image:` key pointing to a GHCR container path
+  2. A GitHub Actions workflow builds multi-arch (amd64, aarch64, armv7) container images on push/tag
+  3. Built images are pushed to GHCR and accessible to HA OS devices
+**Plans**: TBD
+
+Plans:
+- [ ] 04.2-01-PLAN.md — Add image key to config.yaml, create GitHub Actions workflow for multi-arch build + push to GHCR
+
+### Phase 4.3: Release Documentation (INSERTED — Gap Closure)
+**Goal**: CHANGELOG.md and README.md accurately describe all Phases 1-4 features, APIs, and architecture
+**Depends on**: Phase 4.1
+**Gap Closure**: Closes DEPLOY-04 from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. CHANGELOG.md has entries for v5.1 through v6.0 covering all Phase 1-4 features
+  2. README.md architecture section describes StateStore, forecasters, HorizonPlanner, and LP dispatch
+  3. README.md API table lists `/forecast`, `/events`, and all other endpoints
+**Plans**: TBD
+
+Plans:
+- [ ] 04.3-01-PLAN.md — CHANGELOG.md v5.1-v6.0 entries, README.md architecture and API updates
 
 ### Phase 5: Dynamic Buffer
 **Goal**: The battery minimum SoC adapts situationally — higher when PV forecast confidence is low or prices are flat, lower when cheap solar is reliably incoming
@@ -164,6 +206,9 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 2. Vehicle Reliability | 2/2 | Complete    | 2026-02-22 |
 | 3. Data Foundation | 3/3 | Complete   | 2026-02-22 |
 | 4. Predictive Planner | 3/3 | Complete    | 2026-02-22 |
+| 4.1 Deploy Configuration | 0/1 | Not started | - |
+| 4.2 CI/CD Pipeline | 0/1 | Not started | - |
+| 4.3 Release Documentation | 0/1 | Not started | - |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
 | 7. Driver Interaction | 0/3 | Not started | - |
