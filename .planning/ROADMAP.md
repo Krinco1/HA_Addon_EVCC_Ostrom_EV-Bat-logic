@@ -32,11 +32,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. If a user provides an invalid configuration value (e.g., min_soc > max_soc, missing required key, out-of-range percentage), the add-on refuses to start and logs a human-readable error explaining exactly which field is wrong and what the valid range is
   3. All state writes from DataCollector and vehicle monitors go through a single RLock-guarded StateStore; the web server only reads, never writes
   4. Config validation runs before any network connection is attempted, so the add-on fails fast rather than partially initializing
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: Implement StateStore with RLock and callback system; migrate web server to read-only
-- [ ] 01-02: Implement config validation schema with startup rejection and human-readable error messages
+- [ ] 01-01-PLAN.md — Thread-safe StateStore with RLock, SSE push, and web server migration to read-only
+- [ ] 01-02-PLAN.md — Config validation with critical/non-critical classification and startup error page
 
 ### Phase 2: Vehicle Reliability
 **Goal**: Vehicle SoC is always current and correct, charge transitions happen within one decision cycle, and the RL bootstrap does not exhaust memory on Raspberry Pi
@@ -154,13 +154,13 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in dependency order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in dependency order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 Note: Phase 3 can begin in parallel with Phase 2 (both depend only on Phase 1).
 Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. State Infrastructure | 0/2 | Not started | - |
+| 1. State Infrastructure | 0/2 | Planned | - |
 | 2. Vehicle Reliability | 0/3 | Not started | - |
 | 3. Data Foundation | 0/2 | Not started | - |
 | 4. Predictive Planner | 0/3 | Not started | - |
