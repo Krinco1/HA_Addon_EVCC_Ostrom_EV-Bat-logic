@@ -62,11 +62,12 @@ Plans:
   2. PV generation estimates for the next 24h are available to the planner by reading the evcc solar tariff API; when the API returns partial data (less than 24h), the planner notes reduced forecast confidence
   3. ConsumptionForecaster exposes rolling hour-of-day averages that update incrementally as new data arrives — no full refit required each cycle
   4. If InfluxDB history is under 2 weeks old, the system falls back to sensible defaults and logs that forecast accuracy will improve as history accumulates
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Implement ConsumptionForecaster: pull HA/InfluxDB 15-min consumption history, build rolling hour-of-day average model, expose per-slot forecast with confidence flag
-- [ ] 03-02: Integrate evcc solar tariff API into PV forecast pipeline; handle partial forecasts with confidence reduction; wire both forecasts into StateStore
+- [ ] 03-01-PLAN.md — ConsumptionForecaster with tiered InfluxDB aggregation, HA entity discovery, and persistent versioned model
+- [ ] 03-02-PLAN.md — PVForecaster with evcc solar tariff integration, correction coefficient, and partial forecast handling
+- [ ] 03-03-PLAN.md — Wire forecasters into main loop, extend StateStore, dashboard 24h SVG forecast chart with SSE
 
 ### Phase 4: Predictive Planner
 **Goal**: A rolling-horizon LP optimizer produces a 24-48h joint battery and EV dispatch plan every decision cycle, replacing all static euro price limits
@@ -161,7 +162,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 |-------|----------------|--------|-----------|
 | 1. State Infrastructure | 2/2 | Complete    | 2026-02-22 |
 | 2. Vehicle Reliability | 2/2 | Complete    | 2026-02-22 |
-| 3. Data Foundation | 0/2 | Not started | - |
+| 3. Data Foundation | 0/3 | Not started | - |
 | 4. Predictive Planner | 0/3 | Not started | - |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
