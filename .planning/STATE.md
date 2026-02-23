@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 7 (Driver Interaction) — both plans complete, ready for Phase 8
+**Current focus:** Phase 7 (Driver Interaction) — all 3 plans complete, ready for Phase 8
 
 ## Current Position
 
 Phase: 7 of 8 (Driver Interaction)
-Plan: 2 of 2 in current phase — 07-02 complete (Departure Time Queries)
-Status: DepartureTimeStore with persistence; send_departure_inquiry() with 4 inline buttons; plug-in detection; _get_departure_times() reads from store; 30-min timeout (74815cf)
-Last activity: 2026-02-23 — Phase 7 Plan 02 executed (74815cf)
+Plan: 3 of 3 in current phase — 07-03 complete (Urgency-Based Vehicle Ranking)
+Status: Urgency scoring (SoC deficit / hours to departure); dashboard urgency cards with Dringlichkeit label and priority badges; departure_store injected into sequencer (17d4211)
+Last activity: 2026-02-23 — Phase 7 Plan 03 executed (17d4211)
 
-Progress: [██████████] 96%
+Progress: [██████████] 98%
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: [██████████] 96%
 | Phase 06 P03 | 1 | 4 min | 4 min |
 | Phase 07 P01 | 1 | 4 min | 4 min |
 | Phase 07 P02 | 1 | 4 min | 4 min |
+| Phase 07 P03 | 1 | 3 min | 3 min |
 
 **Recent Trend:**
 - Last 5 plans: 4 min, 5 min, 8 min, 4 min, 4 min
@@ -78,6 +79,10 @@ Recent decisions affecting current work:
 - [Phase 07-02]: morgen frueh (frueh variant) accepted by regex — handles German ASCII umlaut substitution
 - [Phase 07-02]: departure_store injected as late attribute into notifier and web server; _get_departure_times() extended with departure_store + state params
 - [Phase 07-02]: plug-in detection defers last_ev_connected update until ev_name known — avoids false-negative when evcc slow to resolve vehicle name
+- [Phase 07-03]: get_requests_summary() return type changed to list (each entry has 'vehicle' key) — fixes pre-existing JS array/dict mismatch
+- [Phase 07-03]: Past departure times treated as 12h default window (no urgency inflation for expired entries)
+- [Phase 07-03]: Connected vehicle tie-break +5.0; quiet hours absolute priority +1000.0 preserved
+- [Phase 07-03]: urgency color thresholds: red >= 10, amber >= 3, blue < 3
 
 ### Pending Todos
 
@@ -91,6 +96,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 07-02-PLAN.md — Departure Time Queries implemented
-Resume file: .planning/phases/07-driver-interaction/07-02-SUMMARY.md
+Stopped at: Completed 07-03-PLAN.md — Urgency-Based Vehicle Ranking implemented
+Resume file: .planning/phases/07-driver-interaction/07-03-SUMMARY.md
 Next: Execute Phase 8 (RL Advisory)
