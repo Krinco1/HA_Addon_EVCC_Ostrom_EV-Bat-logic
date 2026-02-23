@@ -186,13 +186,14 @@ Plans:
   3. The system tracks forecast reliability (PV, consumption, price) over time and applies learned confidence factors when these forecasts feed into the planner — a forecast source that is consistently 30% off gets a lower confidence weight than one that is consistently accurate
   4. The dashboard shows a live RL vs planner comparison widget: rolling win-rate (percentage of cycles where RL corrections reduced cost vs plan-only), average cost delta per day, and cumulative savings estimate
   5. The RL agent runs in shadow mode (logging corrections but not applying them) for the first 30 days, and transitions to advisory mode only after a structured constraint audit confirms no shadow corrections would have violated safety constraints
-**Plans**: 4 plans
+**Plans**: 5 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — ResidualRLAgent with delta corrections (+/-20ct clip), stratified replay buffer, extended Comparator with slot-0 cost accounting
-- [ ] 08-02-PLAN.md — SeasonalLearner (48-cell lookup table) and ForecastReliabilityTracker (per-source rolling MAE with confidence factors)
-- [ ] 08-03-PLAN.md — ReactionTimingTracker, main loop wiring for all learners, shadow mode branching, confidence factors into planner and buffer
-- [ ] 08-04-PLAN.md — Dashboard "Lernen" tab with German labels, GET /rl-learning and /rl-audit endpoints, constraint audit display
+- [x] 08-01-PLAN.md — ResidualRLAgent with delta corrections (+/-20ct clip), stratified replay buffer, extended Comparator with slot-0 cost accounting
+- [x] 08-02-PLAN.md — SeasonalLearner (48-cell lookup table) and ForecastReliabilityTracker (per-source rolling MAE with confidence factors)
+- [x] 08-03-PLAN.md — ReactionTimingTracker, main loop wiring for all learners, shadow mode branching, confidence factors into planner and buffer
+- [x] 08-04-PLAN.md — Dashboard "Lernen" tab with German labels, GET /rl-learning and /rl-audit endpoints, constraint audit display
+- [ ] 08-05-PLAN.md — Gap closure: fix audit checklist array-vs-dict mismatch in app.js
 
 ## Progress
 
