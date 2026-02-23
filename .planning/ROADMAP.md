@@ -169,12 +169,12 @@ Plans:
   2. When a vehicle is plugged in, the system sends a Telegram message to the driver within one decision cycle asking "Wann brauchst du den [vehicle name]?" with a 30-minute reply window; if no reply arrives, the system falls back to the configured default departure time
   3. When two vehicles are waiting to charge, the sequencer prioritizes based on urgency (time to departure vs SoC deficit) rather than SoC alone — a vehicle departing in 2h with 50% SoC takes priority over one departing in 12h with 40% SoC
   4. All overrides expire after 90 minutes maximum; after expiry the planner resumes control and the driver is notified via Telegram
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Implement manual override: dashboard boost button + Telegram command; override marker in plan timeline; 90-minute expiry with Telegram notification
-- [ ] 07-02: Implement proactive departure-time Telegram query: trigger on vehicle plug-in event, 30-min reply window, fallback to config default, feed departure time into HorizonPlanner
-- [ ] 07-03: Refactor multi-EV prioritization: urgency scoring (SoC deficit / hours to departure); replace SoC-only ranking in ChargeSequencer
+- [ ] 07-01-PLAN.md — OverrideManager class, POST /override/boost+cancel endpoints, dashboard Boost button on vehicle cards, Telegram /boost+/stop commands, 90-min expiry, quiet-hours guard, Gantt override marker
+- [ ] 07-02-PLAN.md — DepartureTimeStore with JSON persistence, plug-in event detection, Telegram departure inquiry with inline buttons + free-text parsing, 30-min timeout, _get_departure_times() integration
+- [ ] 07-03-PLAN.md — Urgency scoring (SoC deficit / hours to departure) in ChargeSequencer._rank_vehicles(), dashboard vehicle card urgency display with German labels
 
 ### Phase 8: Residual RL and Learning
 **Goal**: The RL agent learns signed delta corrections to the planner's decisions, a seasonal learner accumulates pattern data, forecast accuracy improves through confidence calibration, and the dashboard shows RL performance vs the planner
