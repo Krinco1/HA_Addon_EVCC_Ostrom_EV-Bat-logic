@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 6 (Decision Transparency) — Plan 03 complete (Phase 6 DONE)
+**Current focus:** Phase 7 (Driver Interaction) — Context gathered, ready to plan
 
 ## Current Position
 
@@ -83,5 +83,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 06-03-PLAN.md — Phase 6 fully complete (PlanSnapshotter, /history endpoint, Historie tab)
-Next: Phase 7 (Driver Interaction) or Phase 8 (RL Advisory)
+Stopped at: Phase 7 context gathered — Override UX, Telegram flow, Multi-EV priority, edge cases discussed
+Resume file: .planning/phases/07-driver-interaction/07-CONTEXT.md
+Next: Plan Phase 7 → /gsd:plan-phase 7
