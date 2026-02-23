@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 7 (Driver Interaction) — Plan 01 complete
+**Current focus:** Phase 7 (Driver Interaction) — both plans complete, ready for Phase 8
 
 ## Current Position
 
 Phase: 7 of 8 (Driver Interaction)
-Plan: 1 of 2 in current phase — 07-01 complete (Boost Charge override system)
-Status: OverrideManager with activate/cancel/expiry; /override/boost, /override/cancel, /override/status API; Dashboard Boost button on vehicle cards; Telegram /boost and /stop commands (7e47bf8)
-Last activity: 2026-02-23 — Phase 7 Plan 01 executed (7e47bf8)
+Plan: 2 of 2 in current phase — 07-02 complete (Departure Time Queries)
+Status: DepartureTimeStore with persistence; send_departure_inquiry() with 4 inline buttons; plug-in detection; _get_departure_times() reads from store; 30-min timeout (74815cf)
+Last activity: 2026-02-23 — Phase 7 Plan 02 executed (74815cf)
 
-Progress: [██████████] 91%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: 3.9 min
-- Total execution time: 0.65 hours
+- Total execution time: 0.72 hours
 
 **By Phase:**
 
@@ -40,9 +40,10 @@ Progress: [██████████] 91%
 | Phase 06 P02 | 1 | 8 min | 8 min |
 | Phase 06 P03 | 1 | 4 min | 4 min |
 | Phase 07 P01 | 1 | 4 min | 4 min |
+| Phase 07 P02 | 1 | 4 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 12 min, 4 min, 5 min, 8 min, 4 min
+- Last 5 plans: 4 min, 5 min, 8 min, 4 min, 4 min
 - Trend: stable
 
 ## Accumulated Context
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - [Phase 07-01]: last-activated-wins for Boost override — no explicit cancel required when switching vehicles
 - [Phase 07-01]: cancel() does NOT call evcc — main loop restores LP-controlled mode on next cycle (avoids double-write)
 - [Phase 07-01]: override_manager injected as late attribute (same pattern as buffer_calc, sequencer, plan_snapshotter)
+- [Phase 07-02]: morgen frueh (frueh variant) accepted by regex — handles German ASCII umlaut substitution
+- [Phase 07-02]: departure_store injected as late attribute into notifier and web server; _get_departure_times() extended with departure_store + state params
+- [Phase 07-02]: plug-in detection defers last_ev_connected update until ev_name known — avoids false-negative when evcc slow to resolve vehicle name
 
 ### Pending Todos
 
@@ -87,6 +91,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 07-01-PLAN.md — Boost Charge override system implemented
-Resume file: .planning/phases/07-driver-interaction/07-01-SUMMARY.md
-Next: Execute Phase 7 Plan 02
+Stopped at: Completed 07-02-PLAN.md — Departure Time Queries implemented
+Resume file: .planning/phases/07-driver-interaction/07-02-SUMMARY.md
+Next: Execute Phase 8 (RL Advisory)
