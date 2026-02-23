@@ -141,8 +141,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — DynamicBufferCalc engine with formula, observation mode, persistence; main loop integration; StateStore SSE extension
-- [ ] 05-02-PLAN.md — Dashboard UI: confidence widget, observation banner, buffer history chart, event log table, POST API endpoints for mode control
+- [x] 05-01-PLAN.md — DynamicBufferCalc engine with formula, observation mode, persistence; main loop integration; StateStore SSE extension
+- [x] 05-02-PLAN.md — Dashboard UI: confidence widget, observation banner, buffer history chart, event log table, POST API endpoints for mode control
 
 ### Phase 6: Decision Transparency
 **Goal**: Users can see the full 24-48h plan in the dashboard, understand why each slot was chosen, and compare what was planned against what actually happened
@@ -172,9 +172,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — OverrideManager class, POST /override/boost+cancel endpoints, dashboard Boost button on vehicle cards, Telegram /boost+/stop commands, 90-min expiry, quiet-hours guard, Gantt override marker
-- [ ] 07-02-PLAN.md — DepartureTimeStore with JSON persistence, plug-in event detection, Telegram departure inquiry with inline buttons + free-text parsing, 30-min timeout, _get_departure_times() integration
-- [ ] 07-03-PLAN.md — Urgency scoring (SoC deficit / hours to departure) in ChargeSequencer._rank_vehicles(), dashboard vehicle card urgency display with German labels
+- [x] 07-01-PLAN.md — OverrideManager class, POST /override/boost+cancel endpoints, dashboard Boost button on vehicle cards, Telegram /boost+/stop commands, 90-min expiry, quiet-hours guard, Gantt override marker
+- [x] 07-02-PLAN.md — DepartureTimeStore with JSON persistence, plug-in event detection, Telegram departure inquiry with inline buttons + free-text parsing, 30-min timeout, _get_departure_times() integration
+- [x] 07-03-PLAN.md — Urgency scoring (SoC deficit / hours to departure) in ChargeSequencer._rank_vehicles(), dashboard vehicle card urgency display with German labels
 
 ### Phase 8: Residual RL and Learning
 **Goal**: The RL agent learns signed delta corrections to the planner's decisions, a seasonal learner accumulates pattern data, forecast accuracy improves through confidence calibration, and the dashboard shows RL performance vs the planner
@@ -193,7 +193,7 @@ Plans:
 - [x] 08-02-PLAN.md — SeasonalLearner (48-cell lookup table) and ForecastReliabilityTracker (per-source rolling MAE with confidence factors)
 - [x] 08-03-PLAN.md — ReactionTimingTracker, main loop wiring for all learners, shadow mode branching, confidence factors into planner and buffer
 - [x] 08-04-PLAN.md — Dashboard "Lernen" tab with German labels, GET /rl-learning and /rl-audit endpoints, constraint audit display
-- [ ] 08-05-PLAN.md — Gap closure: fix audit checklist array-vs-dict mismatch in app.js
+- [x] 08-05-PLAN.md — Gap closure: fix audit checklist array-vs-dict mismatch in app.js
 
 ### Phase 8.1: Seasonal Feedback + Phase 5 Verification (INSERTED — Gap Closure)
 **Goal**: SeasonalLearner corrections flow into HorizonPlanner LP objective, and Phase 5 Dynamic Buffer has formal verification
@@ -204,10 +204,10 @@ Plans:
   1. `SeasonalLearner.get_correction_factor()` is called in main.py and its output is passed to `HorizonPlanner.plan()` as a seasonal cost correction
   2. The LP solver incorporates the seasonal correction when computing dispatch decisions — slots in seasons with historically high plan errors get adjusted cost coefficients
   3. Phase 5 Dynamic Buffer has a VERIFICATION.md confirming all must_haves against the actual codebase
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 08.1-01: Wire SeasonalLearner.get_correction_factor() into main.py → HorizonPlanner.plan() → _solve_lp() as seasonal cost offset; verify Phase 5 DynamicBufferCalc
+- [ ] 08.1-01-PLAN.md — Wire SeasonalLearner into LP objective with dampened correction + Phase 5 VERIFICATION.md
 
 ## Progress
 
