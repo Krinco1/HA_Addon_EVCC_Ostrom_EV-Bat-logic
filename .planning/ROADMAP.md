@@ -156,7 +156,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — ExplanationGenerator class, GET /plan endpoint, 3-tab dashboard navigation
+- [x] 06-01-PLAN.md — ExplanationGenerator class, GET /plan endpoint, 3-tab dashboard navigation (completed 2026-02-23)
 - [ ] 06-02-PLAN.md — SVG Gantt chart with price overlay, hover tooltips, click-detail explanations
 - [ ] 06-03-PLAN.md — PlanSnapshotter for InfluxDB, GET /history endpoint, Historie tab with overlay chart and cost-deviation table
 
@@ -212,6 +212,6 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 4.2 CI/CD Pipeline | 1/1 | Complete (CI test-only, GHCR abandoned) | 2026-02-23 |
 | 4.3 Release Documentation | 1/1 | Complete | 2026-02-23 |
 | 5. Dynamic Buffer | 2/2 | Complete   | 2026-02-23 |
-| 6. Decision Transparency | 0/3 | Not started | - |
+| 6. Decision Transparency | 1/3 | In progress | - |
 | 7. Driver Interaction | 0/3 | Not started | - |
 | 8. Residual RL and Learning | 0/5 | Not started | - |

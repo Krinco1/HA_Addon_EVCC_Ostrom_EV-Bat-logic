@@ -19,14 +19,14 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 
 - [x] **PLAN-01**: System erstellt einen 24-48h Rolling-Horizon Energieplan der Batterie und EV gemeinsam optimiert
 - [x] **PLAN-02**: Statische Euro-Ladegrenzen (ev_max_price_ct, battery_max_price_ct) werden durch dynamische planbasierte Optimierung ersetzt
-- [ ] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
+- [x] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
 - [x] **PLAN-04**: Hausverbrauch wird aus HA-Datenbank/InfluxDB-Historie hochgerechnet und in Planung berücksichtigt
 - [x] **PLAN-05**: PV-Ertragsprognose wird via evcc Solar-Tariff API bezogen und in den 24-48h Plan integriert
 
 ### Transparenz
 
-- [ ] **TRAN-01**: Jede Entscheidung wird mit menschenlesbarer Begründung begleitet ("Lade Kia jetzt weil Preis im unteren 20% und Abfahrt in 6h")
-- [ ] **TRAN-02**: Dashboard zeigt 24-48h Zeitstrahl-Ansicht des Plans mit Preis-Overlay und geplanten Lade-/Entladezeitfenstern
+- [x] **TRAN-01**: Jede Entscheidung wird mit menschenlesbarer Begründung begleitet ("Lade Kia jetzt weil Preis im unteren 20% und Abfahrt in 6h")
+- [x] **TRAN-02**: Dashboard zeigt 24-48h Zeitstrahl-Ansicht des Plans mit Preis-Overlay und geplanten Lade-/Entladezeitfenstern
 - [ ] **TRAN-03**: Dashboard zeigt RL vs Planer Vergleichsdaten (Win-Rate, Kostenvergleich)
 - [ ] **TRAN-04**: Dashboard zeigt historischen Vergleich: was geplant war vs was tatsächlich passiert ist
 
@@ -82,7 +82,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RELI-05 | Phase 2 | Complete — 02-02-PLAN.md |
 | PLAN-01 | Phase 4 | Complete |
 | PLAN-02 | Phase 4 | Complete |
-| PLAN-03 | Phase 5 | Pending |
+| PLAN-03 | Phase 5 | Complete |
 | PLAN-04 | Phase 3 | Complete |
 | PLAN-05 | Phase 3 | Complete |
 | TRAN-01 | Phase 6 | Pending |

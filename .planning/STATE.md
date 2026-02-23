@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 6 (Decision Transparency) — context gathered, ready to plan
+**Current focus:** Phase 6 (Decision Transparency) — Plan 01 complete
 
 ## Current Position
 
-Phase: 6 of 8 (Decision Transparency) — Context gathered, ready to plan
-Plan: 0 of 3 in current phase — not started
-Status: Phase 6 context gathered — Timeline (Gantt+Preisoverlay), Erklärungen (DE, Progressive Disclosure), Historie (Chart+Tabelle, kostenbasiert), Tabs-Integration
-Last activity: 2026-02-23 — Phase 6 context discussion completed (4cd8316)
+Phase: 6 of 8 (Decision Transparency)
+Plan: 1 of 3 in current phase — 06-01 complete
+Status: ExplanationGenerator + /plan endpoint + 3-tab navigation skeleton complete (f1f9546)
+Last activity: 2026-02-23 — Phase 6 Plan 01 executed (f1f9546)
 
-Progress: [█████████░] 75%
+Progress: [█████████░] 78%
 
 ## Performance Metrics
 
@@ -36,10 +36,11 @@ Progress: [█████████░] 75%
 | Phase 04.3 | 1 | 3 min | 3 min |
 | Phase 05 P01 | 1 | 12 min | 12 min |
 | Phase 05 P02 | 1 | 4 min | 4 min |
+| Phase 06 P01 | 1 | 5 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 5 min, 2 min, 3 min, 12 min, 4 min
-- Trend: stable (Phase 5 complete — dashboard UI + API in 4 min)
+- Last 5 plans: 2 min, 3 min, 12 min, 4 min, 5 min
+- Trend: stable
 
 ## Accumulated Context
 
@@ -60,6 +61,8 @@ Recent decisions affecting current work:
 - [Phase 05-02]: buffer_calc injected via late attribute assignment (web.buffer_calc = buffer_calc) — consistent with all other components; WebServer started early before buffer_calc is created
 - [Phase 05-02]: SVG chart uses two polylines (obs=dashed/50% opacity, live=solid) for visual mode distinction
 - [Phase 05-02]: confirm() dialog before activateBufferLive() to prevent accidental live activation
+- [Phase 06-01]: Cost delta uses price-comparison approximation (current slot vs cheapest future slot), prefixed "ca." per user convention — not LP dual variables
+- [Phase 06-01]: switchTab() defined as inline fallback in dashboard.html with 'if typeof === undefined' guard — app.js overrides in Plan 02 with full implementation
 
 ### Pending Todos
 
@@ -73,5 +76,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Phase 6 context gathered — all 4 areas discussed (Timeline, Erklärungen, Historie, Integration)
-Next: Plan Phase 6 → /gsd:plan-phase 6
+Stopped at: Completed 06-01-PLAN.md — ExplanationGenerator, /plan endpoint, 3-tab navigation
+Next: Execute 06-02-PLAN.md — SVG Gantt chart with price overlay, hover tooltips, click-detail explanations
