@@ -1535,6 +1535,243 @@ function switchTab(name) {
 function fetchAndRenderHistory() { /* Plan 03 */ }
 
 /**
+ * Render an SVG Gantt chart of 96 dispatch slots into #planChartWrap.
+ * Shows color-coded bars (green=bat_charge, orange=bat_discharge, blue=ev_charge,
+ * gold=pv background), a red price polyline overlay, time axis labels,
+ * hover tooltips (explanation_short), and click-to-expand detail (explanation_long).
+ *
+ * @param {Array} slots     Array of DispatchSlot objects from /plan
+ * @param {string} computedAt ISO timestamp when plan was computed
+ */
+function renderPlanGantt(slots, computedAt) {
+    var wrap = $('planChartWrap');
+    if (!wrap || !slots || !slots.length) return;
+
+    // --- Layout ---
+    var W = 960, H = 250;
+    var marginL = 50, marginR = 50, marginT = 25, marginB = 35;
+    var plotW = W - marginL - marginR;
+    var plotH = H - marginT - marginB;
+    var n = slots.length;
+    var slotW = plotW / n;
+
+    // --- Scale: maxPower across all kW values ---
+    var maxPower = 0.1;
+    for (var i = 0; i < n; i++) {
+        var sl = slots[i];
+        if ((sl.bat_charge_kw || 0) > maxPower) maxPower = sl.bat_charge_kw;
+        if ((sl.bat_discharge_kw || 0) > maxPower) maxPower = sl.bat_discharge_kw;
+        if ((sl.ev_charge_kw || 0) > maxPower) maxPower = sl.ev_charge_kw;
+    }
+    maxPower = Math.max(maxPower, 1.0);
+
+    // --- Scale: price ---
+    var maxPrice = 0.1;
+    for (var pi = 0; pi < n; pi++) {
+        if ((slots[pi].price_ct || 0) > maxPrice) maxPrice = slots[pi].price_ct;
+    }
+    maxPrice = Math.max(maxPrice, 1.0);
+
+    var s = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+
+    // --- PV background bars (drawn FIRST so action bars overlay) ---
+    for (var vi = 0; vi < n; vi++) {
+        var pvKw = slots[vi].pv_kw || 0;
+        if (pvKw > 0.1) {
+            var pvH = (pvKw / maxPower) * plotH;
+            var pvX = marginL + vi * slotW;
+            var pvY = marginT + plotH - pvH;
+            s += '<rect x="' + pvX.toFixed(1) + '" y="' + pvY.toFixed(1) + '" width="' + slotW.toFixed(1) + '" height="' + pvH.toFixed(1) + '" fill="#ffd700" opacity="0.2"/>';
+        }
+    }
+
+    // --- Action bars (bat charge, bat discharge, ev charge) ---
+    for (var bi = 0; bi < n; bi++) {
+        var slot = slots[bi];
+        var bx = marginL + bi * slotW;
+        var stackY = marginT + plotH; // starting y from bottom, stacking upward
+
+        // Battery charge (green)
+        var bcKw = slot.bat_charge_kw || 0;
+        if (bcKw > 0.1) {
+            var bcH = (bcKw / maxPower) * plotH;
+            stackY -= bcH;
+            s += '<rect x="' + bx.toFixed(1) + '" y="' + stackY.toFixed(1) + '" width="' + slotW.toFixed(1) + '" height="' + bcH.toFixed(1) + '" fill="#00ff88" opacity="0.85" class="plan-slot" data-idx="' + bi + '" style="cursor:pointer;"/>';
+        }
+
+        // Battery discharge (orange) — stacks above battery charge
+        var bdKw = slot.bat_discharge_kw || 0;
+        if (bdKw > 0.1) {
+            var bdH = (bdKw / maxPower) * plotH;
+            stackY -= bdH;
+            s += '<rect x="' + bx.toFixed(1) + '" y="' + stackY.toFixed(1) + '" width="' + slotW.toFixed(1) + '" height="' + bdH.toFixed(1) + '" fill="#ff8800" opacity="0.85" class="plan-slot" data-idx="' + bi + '" style="cursor:pointer;"/>';
+        }
+
+        // EV charge (blue) — stacks above battery
+        var evKw = slot.ev_charge_kw || 0;
+        if (evKw > 0.1) {
+            var evH = (evKw / maxPower) * plotH;
+            stackY -= evH;
+            s += '<rect x="' + bx.toFixed(1) + '" y="' + stackY.toFixed(1) + '" width="' + slotW.toFixed(1) + '" height="' + evH.toFixed(1) + '" fill="#4488ff" opacity="0.85" class="plan-slot" data-idx="' + bi + '" style="cursor:pointer;"/>';
+        }
+
+        // If no action bar was drawn for this slot, add transparent hit-area for tooltip
+        if (bcKw <= 0.1 && bdKw <= 0.1 && evKw <= 0.1) {
+            s += '<rect x="' + bx.toFixed(1) + '" y="' + marginT + '" width="' + slotW.toFixed(1) + '" height="' + plotH + '" fill="transparent" class="plan-slot" data-idx="' + bi + '" style="cursor:pointer;"/>';
+        }
+    }
+
+    // --- Price polyline overlay ---
+    var pricePts = '';
+    for (var ri = 0; ri < n; ri++) {
+        var rpx = marginL + ri * slotW + slotW * 0.5;
+        var priceY = marginT + plotH - ((slots[ri].price_ct || 0) / maxPrice) * plotH;
+        pricePts += (ri === 0 ? 'M' : 'L') + rpx.toFixed(1) + ',' + priceY.toFixed(1) + ' ';
+    }
+    s += '<path d="' + pricePts + '" fill="none" stroke="#ff4444" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.9" pointer-events="none"/>';
+
+    // --- Y-axis labels (left: power in kW) ---
+    s += '<text x="' + (marginL - 6) + '" y="' + (marginT + 4) + '" fill="#888" font-size="9" text-anchor="end" font-family="sans-serif">' + maxPower.toFixed(1) + 'kW</text>';
+    s += '<text x="' + (marginL - 6) + '" y="' + (marginT + plotH) + '" fill="#888" font-size="9" text-anchor="end" font-family="sans-serif">0</text>';
+    s += '<text x="8" y="' + (marginT + plotH / 2) + '" fill="#888" font-size="8" text-anchor="middle" font-family="sans-serif" transform="rotate(-90,8,' + (marginT + plotH / 2) + ')">kW</text>';
+
+    // --- Y-axis labels (right: price in ct) ---
+    s += '<text x="' + (W - marginR + 4) + '" y="' + (marginT + 4) + '" fill="#ff4444" font-size="9" text-anchor="start" font-family="sans-serif">' + maxPrice.toFixed(0) + 'ct</text>';
+    s += '<text x="' + (W - marginR + 4) + '" y="' + (marginT + plotH) + '" fill="#ff4444" font-size="9" text-anchor="start" font-family="sans-serif">0</text>';
+    s += '<text x="' + (W - 8) + '" y="' + (marginT + plotH / 2) + '" fill="#ff4444" font-size="8" text-anchor="middle" font-family="sans-serif" transform="rotate(90,' + (W - 8) + ',' + (marginT + plotH / 2) + ')">ct/kWh</text>';
+
+    // --- X-axis time labels (every 8 slots = every 2 hours) ---
+    for (var ti = 0; ti < n; ti += 8) {
+        var tslot = slots[ti];
+        var timeLabel = '';
+        if (tslot && tslot.start_iso) {
+            try {
+                var td = new Date(tslot.start_iso);
+                var thh = td.getHours();
+                var tmm = td.getMinutes();
+                timeLabel = (thh < 10 ? '0' : '') + thh + ':' + (tmm < 10 ? '0' : '') + tmm;
+            } catch(ex) { timeLabel = ''; }
+        }
+        if (timeLabel) {
+            var tlx = marginL + ti * slotW + slotW * 0.5;
+            var tly = marginT + plotH + 14;
+            s += '<text x="' + tlx.toFixed(1) + '" y="' + tly + '" fill="#888" font-size="9" text-anchor="middle" font-family="sans-serif">' + timeLabel + '</text>';
+        }
+    }
+
+    // --- Computed-at label ---
+    if (computedAt) {
+        try {
+            var ca = new Date(computedAt);
+            var caLabel = 'Plan: ' + (ca.getHours() < 10 ? '0' : '') + ca.getHours() + ':' + (ca.getMinutes() < 10 ? '0' : '') + ca.getMinutes();
+            s += '<text x="' + (W - marginR) + '" y="' + (marginT - 8) + '" fill="#555" font-size="8" text-anchor="end" font-family="sans-serif">' + caLabel + '</text>';
+        } catch(ex) {}
+    }
+
+    // --- Legend ---
+    var legY = H - 8;
+    var legItems = [
+        { color: '#00ff88', label: 'Batterie laden' },
+        { color: '#ff8800', label: 'Batterie entladen' },
+        { color: '#4488ff', label: 'EV laden' },
+        { color: '#ffd700', label: 'PV-Erzeugung' },
+        { color: '#ff4444', label: 'Preis', isLine: true },
+    ];
+    var legX = marginL;
+    for (var lgi = 0; lgi < legItems.length; lgi++) {
+        var leg = legItems[lgi];
+        if (leg.isLine) {
+            s += '<line x1="' + legX + '" y1="' + (legY - 4) + '" x2="' + (legX + 12) + '" y2="' + (legY - 4) + '" stroke="' + leg.color + '" stroke-width="2"/>';
+        } else {
+            s += '<rect x="' + legX + '" y="' + (legY - 8) + '" width="12" height="8" fill="' + leg.color + '" opacity="0.85"/>';
+        }
+        s += '<text x="' + (legX + 14) + '" y="' + legY + '" fill="#888" font-size="9" font-family="sans-serif">' + leg.label + '</text>';
+        legX += leg.label.length * 5.5 + 24;
+    }
+
+    s += '</svg>';
+
+    // Inject SVG into DOM
+    wrap.innerHTML = s;
+
+    // --- Tooltip (hover) ---
+    var tooltip = document.createElement('div');
+    tooltip.style.cssText = 'position:absolute;background:#0f3460;border:1px solid #555;border-radius:4px;padding:6px 10px;font-size:0.82em;color:#eee;pointer-events:none;z-index:100;max-width:280px;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);';
+    wrap.style.position = 'relative';
+    wrap.appendChild(tooltip);
+
+    var planSlotEls = wrap.querySelectorAll('.plan-slot');
+    for (var psi = 0; psi < planSlotEls.length; psi++) {
+        planSlotEls[psi].addEventListener('mouseenter', function() {
+            var idx = parseInt(this.getAttribute('data-idx'));
+            var pslot = window._planSlots && window._planSlots[idx];
+            if (!pslot) return;
+            var short = pslot.explanation_short || '';
+            var ttime = '';
+            if (pslot.start_iso) {
+                try { ttime = new Date(pslot.start_iso).getHours() + ':00'; } catch(ex) {}
+            }
+            tooltip.innerHTML = '<div style="color:#00d4ff;font-size:0.9em;margin-bottom:4px;">' + ttime + '</div>' + escapeHtml(short);
+            tooltip.style.display = 'block';
+        });
+        planSlotEls[psi].addEventListener('mousemove', function(e) {
+            var rect = wrap.getBoundingClientRect();
+            var x = e.clientX - rect.left + 12;
+            var y = e.clientY - rect.top - 12;
+            if (x + 290 > rect.width) x = x - 302;
+            if (y < 0) y = 0;
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        });
+        planSlotEls[psi].addEventListener('mouseleave', function() {
+            tooltip.style.display = 'none';
+        });
+        planSlotEls[psi].addEventListener('click', function() {
+            var idx = parseInt(this.getAttribute('data-idx'));
+            var cslot = window._planSlots && window._planSlots[idx];
+            if (!cslot) return;
+            var detail = $('planDetail');
+            if (!detail) return;
+
+            var ctimeStr = '';
+            if (cslot.start_iso) {
+                try {
+                    var cd = new Date(cslot.start_iso);
+                    ctimeStr = (cd.getHours() < 10 ? '0' : '') + cd.getHours() + ':' + (cd.getMinutes() < 10 ? '0' : '') + cd.getMinutes();
+                } catch(ex) { ctimeStr = cslot.start_iso; }
+            }
+
+            var actionLabel = '';
+            if ((cslot.bat_charge_kw || 0) > 0.1) actionLabel = '<span style="color:#00ff88;">Batterie laden (' + (cslot.bat_charge_kw || 0).toFixed(1) + ' kW)</span>';
+            else if ((cslot.bat_discharge_kw || 0) > 0.1) actionLabel = '<span style="color:#ff8800;">Batterie entladen (' + (cslot.bat_discharge_kw || 0).toFixed(1) + ' kW)</span>';
+            else if ((cslot.ev_charge_kw || 0) > 0.1) actionLabel = '<span style="color:#4488ff;">EV laden (' + (cslot.ev_charge_kw || 0).toFixed(1) + ' kW)</span>';
+            else actionLabel = '<span style="color:#888;">Halten / Idle</span>';
+
+            var dh = '<div style="background:#16213e;border-radius:8px;padding:14px;border-left:3px solid #00d4ff;">';
+            dh += '<div style="font-size:1.05em;font-weight:bold;color:#00d4ff;margin-bottom:10px;">' + ctimeStr + ' \u2014 ' + actionLabel + '</div>';
+            dh += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:0.9em;margin-bottom:12px;">';
+            dh += '<div style="background:#0f3460;padding:8px;border-radius:6px;"><div style="color:#888;font-size:0.8em;">Strompreis</div><div style="color:#ff4444;">' + (cslot.price_ct || 0).toFixed(1) + ' ct/kWh</div></div>';
+            if ((cslot.pv_kw || 0) > 0.1) {
+                dh += '<div style="background:#0f3460;padding:8px;border-radius:6px;"><div style="color:#888;font-size:0.8em;">PV-Erzeugung</div><div style="color:#ffd700;">' + (cslot.pv_kw || 0).toFixed(1) + ' kW</div></div>';
+            }
+            if (cslot.bat_soc_pct != null) {
+                dh += '<div style="background:#0f3460;padding:8px;border-radius:6px;"><div style="color:#888;font-size:0.8em;">Batterie SoC</div><div style="color:#00ff88;">' + (cslot.bat_soc_pct || 0).toFixed(0) + '%</div></div>';
+            }
+            if (cslot.departure_hours != null) {
+                dh += '<div style="background:#0f3460;padding:8px;border-radius:6px;"><div style="color:#888;font-size:0.8em;">Bis Abfahrt</div><div style="color:#00d4ff;">' + (cslot.departure_hours || 0).toFixed(1) + ' h</div></div>';
+            }
+            dh += '</div>';
+            dh += '<div style="font-size:0.92em;line-height:1.6;color:#ccc;">' + escapeHtml(cslot.explanation_long || cslot.explanation_short || '') + '</div>';
+            dh += '</div>';
+
+            detail.innerHTML = dh;
+            detail.style.display = '';
+            detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    }
+}
+
+/**
  * Fetch /plan and render the SVG Gantt chart if data is available.
  * Shows planNoData element if plan is not available.
  */
