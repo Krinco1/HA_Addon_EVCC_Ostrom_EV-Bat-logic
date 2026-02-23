@@ -649,7 +649,7 @@ function renderConfig(s) {
     $('configTable').querySelector('tbody').innerHTML = h;
 }
 
-// ---- Charge Sequencer (NEU v5) ----
+// ---- Charge Sequencer (NEU v5, Urgency v7.3) ----
 function renderSequencer(data) {
     var card = $('sequencerCard');
     if (!card) return;
@@ -659,6 +659,8 @@ function renderSequencer(data) {
     var quietHours = data.quiet_hours || {};
     var isQuiet = data.is_quiet_now || false;
     var preQuiet = data.pre_quiet_recommendation || null;
+    // Phase 7 Plan 03: show urgency info only when 2+ vehicles are present
+    var showUrgency = requests.length >= 2;
 
     var h = '';
 
@@ -668,7 +670,7 @@ function renderSequencer(data) {
         var qIcon = isQuiet ? '\uD83D\uDE34' : '\uD83D\uDD14';
         h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">';
         h += '<span style="background:' + qColor + '22;border:1px solid ' + qColor + ';border-radius:12px;padding:3px 10px;font-size:0.85em;color:' + qColor + ';">';
-        h += qIcon + ' Ruhezeit ' + quietHours.start + ':00–' + quietHours.end + ':00';
+        h += qIcon + ' Ruhezeit ' + quietHours.start + ':00\u2013' + quietHours.end + ':00';
         if (isQuiet) h += ' \u2014 aktiv';
         h += '</span>';
         h += '</div>';
@@ -682,7 +684,7 @@ function renderSequencer(data) {
         h += '</div>';
     }
 
-    // Charge requests
+    // Charge requests — sorted by urgency_score desc (server-side, so index = priority rank)
     if (requests.length > 0) {
         h += '<div style="font-size:0.85em;color:#888;margin-bottom:6px;">Ladewünsche:</div>';
         h += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">';
@@ -694,18 +696,53 @@ function renderSequencer(data) {
             var statusIcon = req.status === 'charging' ? '\u26A1' :
                              req.status === 'scheduled' ? '\uD83D\uDDD3' :
                              req.status === 'done' ? '\u2705' : '\u23F3';
-            h += '<div style="background:#0f3460;border-radius:6px;padding:8px;display:flex;justify-content:space-between;align-items:center;">';
-            h += '<div>';
-            h += '<span style="font-weight:bold;">' + escapeHtml(req.vehicle) + '</span>';
-            h += ' <span style="color:#888;font-size:0.85em;">(' + escapeHtml(req.driver || '') + ')</span>';
-            h += '<br><span style="color:#888;font-size:0.85em;">';
+
+            // Phase 7 Plan 03: priority badge (shown when 2+ vehicles present)
+            var priorityBadge = '';
+            if (showUrgency) {
+                var badgeColor = i === 0 ? '#00ff88' : '#888';
+                priorityBadge = '<span style="background:' + badgeColor + '22;border:1px solid ' + badgeColor + ';' +
+                    'border-radius:10px;padding:1px 7px;font-size:0.8em;color:' + badgeColor + ';margin-right:6px;">' +
+                    'P' + (i + 1) + '</span>';
+            }
+
+            h += '<div style="background:#0f3460;border-radius:6px;padding:8px;">';
+            // Header row: priority badge + vehicle name + driver + status icon
+            h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+            h += '<div>' + priorityBadge + '<span style="font-weight:bold;">' + escapeHtml(req.vehicle) + '</span>';
+            h += ' <span style="color:#888;font-size:0.85em;">(' + escapeHtml(req.driver || '') + ')</span></div>';
+            h += '<div style="display:flex;align-items:center;gap:8px;">';
+            h += '<span style="color:' + statusColor + ';font-size:0.9em;">' + statusIcon + ' ' + req.status + '</span>';
+            h += '<button class="seq-cancel-btn" onclick="cancelSeqRequest(\'' + req.vehicle + '\')" style="font-size:0.75em;padding:2px 6px;">\u274C</button>';
+            h += '</div></div>';
+            // SoC row
+            h += '<div style="color:#888;font-size:0.85em;margin-top:4px;">';
             h += req.current_soc.toFixed(0) + '% \u2192 ' + req.target_soc + '% ';
             h += '<span style="color:#00d4ff;">(' + req.need_kwh.toFixed(1) + ' kWh)</span>';
-            h += '</span></div>';
-            h += '<div style="text-align:right;">';
-            h += '<span style="color:' + statusColor + ';font-size:0.9em;">' + statusIcon + ' ' + req.status + '</span>';
-            h += '<br><button class="seq-cancel-btn" onclick="cancelSeqRequest(\'' + req.vehicle + '\')" style="margin-top:4px;font-size:0.75em;padding:2px 6px;">\u274C</button>';
-            h += '</div></div>';
+            h += '</div>';
+            // Phase 7 Plan 03: urgency info row (only when 2+ vehicles, and not fully charged)
+            if (showUrgency) {
+                var urgencyScore = req.urgency_score != null ? req.urgency_score : 0;
+                var urgencyReason = req.urgency_reason || '';
+                var deptTime = req.departure_time ? req.departure_time : null;
+                h += '<div style="margin-top:5px;padding-top:5px;border-top:1px solid #1a3a6a;">';
+                if (urgencyScore > 0) {
+                    var urgColor = urgencyScore >= 10 ? '#ff4444' : urgencyScore >= 3 ? '#ffaa00' : '#00d4ff';
+                    h += '<span style="color:' + urgColor + ';font-size:0.85em;">Dringlichkeit: ' + urgencyScore.toFixed(1) + '</span>';
+                    if (urgencyReason) {
+                        h += ' <span style="color:#888;font-size:0.8em;">(' + escapeHtml(urgencyReason) + ')</span>';
+                    }
+                } else {
+                    h += '<span style="color:#00ff88;font-size:0.85em;">Voll geladen</span>';
+                }
+                if (deptTime) {
+                    var deptDate = new Date(deptTime);
+                    var deptStr = deptDate.getHours() + ':' + ('0' + deptDate.getMinutes()).slice(-2);
+                    h += '<span style="color:#888;font-size:0.8em;margin-left:8px;">Abfahrt: ' + deptStr + '</span>';
+                }
+                h += '</div>';
+            }
+            h += '</div>';
         }
         h += '</div>';
     } else {
@@ -729,7 +766,7 @@ function renderSequencer(data) {
             var startH = slot.start ? new Date(slot.start).getHours() + ':00' : '--';
             var endH = slot.end ? new Date(slot.end).getHours() + ':00' : '--';
             h += '<div style="background:#16213e;border-left:3px solid ' + srcColor + ';border-radius:4px;padding:6px 10px;display:flex;justify-content:space-between;font-size:0.85em;">';
-            h += '<span>' + srcIcon + ' <strong>' + escapeHtml(slot.vehicle) + '</strong> ' + startH + '–' + endH + '</span>';
+            h += '<span>' + srcIcon + ' <strong>' + escapeHtml(slot.vehicle) + '</strong> ' + startH + '\u2013' + endH + '</span>';
             h += '<span style="color:' + srcColor + ';">' + slot.kwh.toFixed(1) + ' kWh @ ' + slot.price_ct.toFixed(1) + 'ct</span>';
             h += '</div>';
         }
