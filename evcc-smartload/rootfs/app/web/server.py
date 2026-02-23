@@ -91,6 +91,10 @@ class WebServer:
         self.override_manager = None
         # Phase 7 Plan 02: departure time store (wired late by main.py)
         self.departure_store = None
+        # Phase 8: RL learner components (wired late by main.py)
+        self.seasonal_learner = None
+        self.forecast_reliability = None
+        self.reaction_timing = None
 
     # ------------------------------------------------------------------
     # Start
@@ -261,6 +265,11 @@ class WebServer:
                 # Phase 7 Plan 02: departure times for dashboard polling
                 elif path == "/departure-times":
                     self._json(srv._api_departure_times())
+                # Phase 8: RL learning status for Lernen tab
+                elif path == "/rl-learning":
+                    self._json(srv._api_rl_learning())
+                elif path == "/rl-audit":
+                    self._json(srv._api_rl_audit())
                 elif path == "/docs":
                     self._html(srv._docs_index())
                 elif path.startswith("/docs/"):
@@ -796,6 +805,67 @@ class WebServer:
             dep = self.departure_store.get(state.ev_name)
             vehicles[state.ev_name] = dep.isoformat() if dep else None
         return {"available": True, "departure_times": vehicles}
+
+    def _api_rl_learning(self) -> dict:
+        """Phase 8: Returns RL learning status for the Lernen tab."""
+        agent = getattr(self, 'rl', None)
+        seasonal = getattr(self, 'seasonal_learner', None)
+        reliability = getattr(self, 'forecast_reliability', None)
+        comparator = getattr(self, 'comparator', None)
+
+        # Default response when components unavailable
+        result = {
+            "mode": "shadow",
+            "shadow_days_elapsed": 0,
+            "shadow_days_remaining": 30,
+            "win_rate_7d": None,
+            "avg_daily_savings_eur": None,
+            "cumulative_savings_eur": 0.0,
+            "audit": None,
+            "seasonal_cells_populated": 0,
+            "forecast_confidence": {
+                "pv": 1.0,
+                "consumption": 1.0,
+                "price": 1.0,
+            },
+        }
+
+        if agent is not None:
+            shadow_elapsed = agent.shadow_elapsed_days()
+            shadow_remaining = max(0, 30 - shadow_elapsed)
+            result["mode"] = agent.mode
+            result["shadow_days_elapsed"] = shadow_elapsed
+            result["shadow_days_remaining"] = shadow_remaining
+
+        if comparator is not None:
+            comparisons_7d = comparator.get_recent_comparisons(days=7)
+            n = len(comparisons_7d)
+            if n >= 10:
+                wins = sum(1 for c in comparisons_7d if c.get("rl_better"))
+                result["win_rate_7d"] = round(wins / n, 3)
+            result["avg_daily_savings_eur"] = comparator.avg_daily_savings()
+            result["cumulative_savings_eur"] = round(comparator.cumulative_savings_eur(), 2)
+
+        if agent is not None and agent.shadow_elapsed_days() >= 30:
+            result["audit"] = agent.get_audit_result()
+
+        if seasonal is not None:
+            result["seasonal_cells_populated"] = seasonal.populated_cell_count()
+
+        if reliability is not None:
+            result["forecast_confidence"] = reliability.get_all_confidences()
+
+        return result
+
+    def _api_rl_audit(self) -> dict:
+        """Phase 8: Returns detailed constraint audit results."""
+        agent = getattr(self, 'rl', None)
+        if agent is None:
+            return {"available": False}
+        audit = agent.get_audit_result()
+        if audit is None:
+            return {"available": False, "reason": "Shadow period not yet elapsed"}
+        return {"available": True, "audit": audit}
 
     def _api_chart_data(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
         snap = self._store.snapshot()
