@@ -32,7 +32,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 
 ### Fahrer-Interaktion
 
-- [ ] **DRIV-01**: Nutzer kann über Dashboard und Telegram jederzeit eine Sofort-Ladung auslösen die den Plan überschreibt
+- [x] **DRIV-01**: Nutzer kann über Dashboard und Telegram jederzeit eine Sofort-Ladung auslösen die den Plan überschreibt
 - [ ] **DRIV-02**: System fragt Fahrer proaktiv via Telegram nach Abfahrtszeit wenn Fahrzeug angesteckt wird
 - [ ] **DRIV-03**: Multi-EV Priorisierung basiert auf Fahrer-Kontext (Abfahrtszeit, Bedarf) statt nur SoC-Ranking
 
@@ -89,7 +89,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRAN-02 | Phase 6 | Complete |
 | TRAN-03 | Phase 8 | Pending |
 | TRAN-04 | Phase 6 | Complete |
-| DRIV-01 | Phase 7 | Pending |
+| DRIV-01 | Phase 7 | Complete |
 | DRIV-02 | Phase 7 | Pending |
 | DRIV-03 | Phase 7 | Pending |
 | LERN-01 | Phase 8 | Pending |
