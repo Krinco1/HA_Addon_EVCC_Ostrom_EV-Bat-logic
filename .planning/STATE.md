@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 8 (Residual RL and Learning) — ALL PLANS COMPLETE (08-01 through 08-04)
+**Current focus:** Phase 8 (Residual RL and Learning) — ALL PLANS COMPLETE (08-01 through 08-05)
 
 ## Current Position
 
 Phase: 8 of 8 (Residual RL and Learning)
-Plan: 4 of 4 in current phase — 08-04 complete (Dashboard Lernen Tab + /rl-learning + /rl-audit endpoints)
-Status: ALL PHASE 8 PLANS COMPLETE — Full RL learning stack operational: ResidualRLAgent, SeasonalLearner, ForecastReliabilityTracker, ReactionTimingTracker wired; Lernen dashboard tab shows shadow mode countdown, performance metrics, audit checklist, confidence bars
-Last activity: 2026-02-23 — Phase 8 Plan 04 executed (1d310cf)
+Plan: 5 of 5 in current phase — 08-05 complete (Fixed audit checklist array-vs-dict mismatch in Lernen tab)
+Status: ALL PHASE 8 PLANS COMPLETE — Full RL learning stack operational with gap closure: constraint audit checklist correctly reflects individual pass/fail from server; Lernen tab fully operational
+Last activity: 2026-02-23 — Phase 8 Plan 05 executed (185b38e)
 
 Progress: [██████████] 99%
 
@@ -51,6 +51,7 @@ Progress: [██████████] 99%
 - Trend: stable
 | Phase 08-residual-rl-and-learning P08-03 | 6 | 2 tasks | 4 files |
 | Phase 08 P04 | 3 | 2 tasks | 3 files |
+| Phase 08-residual-rl-and-learning P05 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ Recent decisions affecting current work:
 - [Phase 08-03]: _action_to_str() returns compound "bat_X/ev_Y" string for ReactionTimingTracker; richer signal than battery-only
 - [Phase 08-04]: ausstehend displayed for None metrics when insufficient data — not 0 or NaN (Pitfall 7)
 - [Phase 08-04]: Lernen tab lazy-loaded on switchTab activation, SSE refreshes only when tab visible
+- [Phase 08-05]: check.name preferred over auditLabels[ci] as display label — server provides German label directly; auditLabels kept as fallback
+- [Phase 08-05]: data.audit.all_passed used directly instead of computing allPassed in JS — server already aggregates
+- [Phase 08-05]: check.detail exposed as title attribute for hover tooltip — zero layout cost, useful for diagnosis
 
 ### Pending Todos
 
@@ -115,6 +119,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 08-04-PLAN.md — Dashboard Lernen tab with RL widget, GET /rl-learning and /rl-audit endpoints
-Resume file: .planning/phases/08-residual-rl-and-learning/08-04-SUMMARY.md
-Next: All Phase 8 plans complete — project v1.0 ready for deployment and 30-day shadow period observation
+Stopped at: Completed 08-05-PLAN.md — Fixed constraint audit checklist array-vs-dict mismatch (gap closure)
+Resume file: .planning/phases/08-residual-rl-and-learning/08-05-SUMMARY.md
+Next: All Phase 8 plans complete — project v1.0 ready for deployment and 30-day shadow period observation; audit checklist fully operational
