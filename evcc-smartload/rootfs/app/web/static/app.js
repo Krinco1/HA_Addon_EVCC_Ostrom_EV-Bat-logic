@@ -1624,6 +1624,12 @@ function applySSEUpdate(msg) {
     if (msg.override !== undefined) {
         _overrideStatus = msg.override || { active: false };
     }
+
+    // Phase 8: Refresh Lernen tab if currently visible
+    var lernenTab = document.getElementById('tab-lernen');
+    if (lernenTab && lernenTab.style.display !== 'none') {
+        fetchAndRenderLernen();
+    }
 }
 
 /**
@@ -1688,7 +1694,7 @@ function startSSE() {
  * that triggers data fetching on tab activation.
  */
 function switchTab(name) {
-    var tabs = ['main', 'plan', 'history'];
+    var tabs = ['main', 'plan', 'history', 'lernen'];
     for (var t = 0; t < tabs.length; t++) {
         var el = document.getElementById('tab-' + tabs[t]);
         if (el) el.style.display = (tabs[t] === name ? '' : 'none');
@@ -1701,6 +1707,9 @@ function switchTab(name) {
     }
     if (name === 'history') {
         fetchAndRenderHistory();
+    }
+    if (name === 'lernen') {
+        fetchAndRenderLernen();
     }
 }
 
@@ -2230,6 +2239,158 @@ function fetchAndRenderPlan() {
         window._planSlots = data.slots;
         renderPlanGantt(data.slots, data.computed_at);
     });
+}
+
+// =============================================================================
+// Phase 8 Plan 04: Lernen tab — RL performance metrics and shadow mode
+// =============================================================================
+
+/**
+ * Fetch /rl-learning and render the Lernen widget.
+ * Called by switchTab('lernen') and on SSE update when Lernen tab is visible.
+ */
+function fetchAndRenderLernen() {
+    fetch('/rl-learning')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var el = document.getElementById('lernenContent');
+            if (!el) return;
+            el.innerHTML = _renderLernenWidget(data);
+        })
+        .catch(function(err) {
+            var el = document.getElementById('lernenContent');
+            if (el) el.innerHTML = '<p>Fehler beim Laden der Lerndaten.</p>';
+        });
+}
+
+/**
+ * Build the full Lernen widget HTML from /rl-learning response data.
+ * All labels in German per locked decision.
+ */
+function _renderLernenWidget(data) {
+    var html = '<div class="chart-card" style="margin-bottom:15px;">';
+
+    // --- Mode badge ---
+    html += '<h3 style="margin-bottom:12px;">Lernmodus</h3>';
+    html += '<div style="margin-bottom:12px;">';
+    if (data.mode === 'advisory') {
+        html += '<span class="lernen-mode-badge lernen-mode-advisory">Beratung</span>';
+    } else {
+        html += '<span class="lernen-mode-badge lernen-mode-shadow">Beobachtung</span>';
+        if (data.shadow_days_remaining > 0) {
+            html += ' <span style="color:#a0aec0;font-size:0.9em;">(noch ' + data.shadow_days_remaining + ' Tage)</span>';
+        }
+    }
+    html += '</div>';
+
+    // --- Metrics section ---
+    html += '<div style="margin-bottom:4px;">';
+
+    // Win-rate
+    html += '<div class="lernen-metric">';
+    html += '<span class="lernen-metric-label">Gewinnrate (7 Tage): </span>';
+    if (data.win_rate_7d !== null && data.win_rate_7d !== undefined) {
+        html += '<span class="lernen-metric-value">' + Math.round(data.win_rate_7d * 100) + '%</span>';
+    } else {
+        html += '<span class="lernen-metric-pending">ausstehend</span>';
+    }
+    html += '</div>';
+
+    // Average daily savings
+    html += '<div class="lernen-metric">';
+    html += '<span class="lernen-metric-label">Tagesersparnis (\u00D8): </span>';
+    if (data.avg_daily_savings_eur !== null && data.avg_daily_savings_eur !== undefined) {
+        html += '<span class="lernen-metric-value">ca. ' + data.avg_daily_savings_eur.toFixed(2).replace('.', ',') + ' EUR</span>';
+    } else {
+        html += '<span class="lernen-metric-pending">ausstehend</span>';
+    }
+    html += '</div>';
+
+    // Cumulative savings
+    html += '<div class="lernen-metric">';
+    html += '<span class="lernen-metric-label">Kumulierte Ersparnis: </span>';
+    var cumSav = (data.cumulative_savings_eur || 0);
+    html += '<span class="lernen-metric-value">ca. ' + cumSav.toFixed(2).replace('.', ',') + ' EUR</span>';
+    html += '</div>';
+
+    // Seasonal cells
+    html += '<div class="lernen-metric">';
+    html += '<span class="lernen-metric-label">Saisonale Zellen: </span>';
+    html += '<span class="lernen-metric-value">' + (data.seasonal_cells_populated || 0) + '/48 bef\u00FCllt</span>';
+    html += '</div>';
+
+    html += '</div>';
+
+    // --- Audit section ---
+    html += '<div class="lernen-audit-section">';
+    var auditLabels = [
+        'SoC-Mindestgrenze eingehalten',
+        'Abfahrtsziel eingehalten',
+        'Korrekturbereich eingehalten',
+        'Positive Gewinnrate'
+    ];
+    var auditKeys = ['min_soc', 'departure_target', 'delta_clip', 'win_rate'];
+
+    if (data.audit !== null && data.audit !== undefined) {
+        html += '<h4 style="margin-bottom:8px;color:#e2e8f0;">Sicherheitspr\u00FCfung</h4>';
+        var checks = data.audit.checks || {};
+        var allPassed = true;
+        for (var ci = 0; ci < auditKeys.length; ci++) {
+            var passed = checks[auditKeys[ci]];
+            if (!passed) allPassed = false;
+            html += '<div class="lernen-audit-check">';
+            if (passed) {
+                html += '<span class="lernen-audit-pass">&#10003;</span> ' + auditLabels[ci];
+            } else {
+                html += '<span class="lernen-audit-fail">&#10007;</span> ' + auditLabels[ci];
+            }
+            html += '</div>';
+        }
+        if (allPassed) {
+            html += '<div style="margin-top:10px;color:#68d391;"><strong>Automatische Bef\u00F6rderung verf\u00FCgbar</strong></div>';
+        } else {
+            html += '<div style="margin-top:10px;color:#ffaa00;"><strong>Weitere Beobachtung erforderlich</strong></div>';
+        }
+    } else {
+        // Audit pending — shadow period not elapsed
+        var daysLeft = data.shadow_days_remaining || 0;
+        html += '<h4 style="margin-bottom:8px;color:#e2e8f0;">Sicherheitspr\u00FCfung (nach ' + daysLeft + ' Tagen)</h4>';
+        for (var pi = 0; pi < auditLabels.length; pi++) {
+            html += '<div class="lernen-audit-check">';
+            html += '<span class="lernen-audit-pending">&mdash;</span> <span class="lernen-metric-pending">' + auditLabels[pi] + ' &ndash; ausstehend</span>';
+            html += '</div>';
+        }
+    }
+    html += '</div>';
+
+    // --- Forecast confidence bars ---
+    var conf = data.forecast_confidence || { pv: 1.0, consumption: 1.0, price: 1.0 };
+    var confItems = [
+        { key: 'pv', label: 'PV' },
+        { key: 'consumption', label: 'Verbrauch' },
+        { key: 'price', label: 'Preis' }
+    ];
+    html += '<div class="lernen-confidence">';
+    html += '<h4 style="margin-bottom:8px;color:#e2e8f0;">Prognose-Qualit\u00E4t</h4>';
+    for (var ki = 0; ki < confItems.length; ki++) {
+        var item = confItems[ki];
+        var val = conf[item.key] !== undefined ? conf[item.key] : 1.0;
+        var pct = Math.round(val * 100);
+        var barColor = val >= 0.8 ? '#68d391' : (val >= 0.5 ? '#ffaa00' : '#fc8181');
+        html += '<div style="margin-bottom:8px;">';
+        html += '<div style="display:flex;justify-content:space-between;font-size:0.9em;margin-bottom:3px;">';
+        html += '<span class="lernen-metric-label">' + item.label + '</span>';
+        html += '<span class="lernen-metric-value">' + pct + '%</span>';
+        html += '</div>';
+        html += '<div class="lernen-confidence-bar">';
+        html += '<div class="lernen-confidence-fill" style="width:' + pct + '%;background:' + barColor + ';"></div>';
+        html += '</div>';
+        html += '</div>';
+    }
+    html += '</div>';
+
+    html += '</div>';
+    return html;
 }
 
 // =============================================================================

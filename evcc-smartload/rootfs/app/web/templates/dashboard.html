@@ -213,6 +213,23 @@
         .boost-btn.boost-active { background: #2e1a00; color: #ff8800; border-color: #ff8800; }
         .boost-btn.boost-blocked { background: #1a1a2e; color: #888; border-color: #555; }
         .boost-btn.boost-cancel { background: #2e0a0a; color: #ff4444; border: 1px solid #ff4444; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+
+        /* Phase 8: Lernen tab styles */
+        .lernen-mode-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-weight: bold; font-size: 0.9em; }
+        .lernen-mode-shadow { background: #2d3748; color: #a0aec0; border: 1px solid #4a5568; }
+        .lernen-mode-advisory { background: #22543d; color: #68d391; border: 1px solid #48bb78; }
+        .lernen-metric { margin: 8px 0; font-size: 1.1em; }
+        .lernen-metric-label { color: #a0aec0; }
+        .lernen-metric-value { color: #e2e8f0; font-weight: bold; }
+        .lernen-metric-pending { color: #718096; font-style: italic; }
+        .lernen-audit-section { margin-top: 16px; padding: 12px; background: #1a202c; border-radius: 8px; }
+        .lernen-audit-check { margin: 4px 0; }
+        .lernen-audit-pass { color: #68d391; }
+        .lernen-audit-fail { color: #fc8181; }
+        .lernen-audit-pending { color: #a0aec0; }
+        .lernen-confidence { margin-top: 16px; }
+        .lernen-confidence-bar { height: 8px; border-radius: 4px; background: #2d3748; margin: 4px 0; }
+        .lernen-confidence-fill { height: 100%; border-radius: 4px; background: #4299e1; }
     </style>
 </head>
 <body>
@@ -222,6 +239,7 @@
         <button class="tab-btn active" onclick="switchTab('main')">Status</button>
         <button class="tab-btn" onclick="switchTab('plan')">Plan</button>
         <button class="tab-btn" onclick="switchTab('history')">Historie</button>
+        <button class="tab-btn" onclick="switchTab('lernen')">Lernen</button>
     </div>
 
     <!-- Tab: Status (existing content wrapped) -->
@@ -414,6 +432,13 @@
         </div>
     </div>
 
+    <!-- Tab: Lernen (Phase 8 Plan 04 — RL performance metrics and shadow mode) -->
+    <div id="tab-lernen" class="tab-content" style="display:none;">
+        <div id="lernenContent">
+            <p class="tab-loading">Lade Lerndaten...</p>
+        </div>
+    </div>
+
 </div>
 
 <!-- Manual SoC modal -->
@@ -459,12 +484,12 @@
 // This inline version handles basic tab switching before app.js extensions are added.
 if (typeof switchTab === 'undefined') {
     function switchTab(name) {
-        ['main', 'plan', 'history'].forEach(function(t) {
+        ['main', 'plan', 'history', 'lernen'].forEach(function(t) {
             var el = document.getElementById('tab-' + t);
             if (el) el.style.display = (t === name ? '' : 'none');
         });
         document.querySelectorAll('.tab-btn').forEach(function(b, i) {
-            b.classList.toggle('active', ['main', 'plan', 'history'][i] === name);
+            b.classList.toggle('active', ['main', 'plan', 'history', 'lernen'][i] === name);
         });
     }
 }
