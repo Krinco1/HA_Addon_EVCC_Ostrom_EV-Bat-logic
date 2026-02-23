@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 8 (Residual RL and Learning) — Plans 01 and 02 complete
+**Current focus:** Phase 8 (Residual RL and Learning) — Plans 01, 02, and 03 complete
 
 ## Current Position
 
 Phase: 8 of 8 (Residual RL and Learning)
-Plan: 2 of 4 in current phase — 08-01 complete (ResidualRLAgent + Comparator Extension)
-Status: ResidualRLAgent (49-action delta space, stratified seasonal replay, shadow/advisory mode) + Comparator slot-0 cost accounting; model_version=2 migration guard resets old DQNAgent Q-tables cleanly
-Last activity: 2026-02-23 — Phase 8 Plan 01 executed (2444010)
+Plan: 3 of 4 in current phase — 08-03 complete (ReactionTimingTracker + All Phase 8 Learner Wiring)
+Status: All four Phase 8 learners (ResidualRLAgent, SeasonalLearner, ForecastReliabilityTracker, ReactionTimingTracker) wired into main.py; confidence factors flow to HorizonPlanner + DynamicBufferCalc; shadow/advisory RL branching live
+Last activity: 2026-02-23 — Phase 8 Plan 03 executed (fe85803)
 
 Progress: [██████████] 99%
 
@@ -49,6 +49,7 @@ Progress: [██████████] 99%
 **Recent Trend:**
 - Last 5 plans: 4 min, 3 min, 4 min, 4 min, 2 min
 - Trend: stable
+| Phase 08-residual-rl-and-learning P08-03 | 6 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,11 @@ Recent decisions affecting current work:
 - [Phase 08-02]: MONTH_TO_SEASON explicit dict avoids naive (month-1)//3 bug that maps December to season 3 (autumn)
 - [Phase 08-02]: ForecastReliabilityTracker PV reference scale is 5.0 kW; callers must convert state.pv_power (W) to kW
 - [Phase 08-02]: SeasonalLearner: no decay (simple running average) — decay deferred to Phase 9 per research recommendation
+- [Phase 08-03]: ReactionTimingTracker EMA initial value = 0.5, wait_threshold = 0.6 — system defaults to re-planning until it learns deviations self-correct; conservative start
+- [Phase 08-03]: confidence_factors applied only to PV surplus in LP objective (not price coefficients) — per research Open Question 1; price confidence flows through DynamicBufferCalc
+- [Phase 08-03]: pv_reliability_factor multiplied on existing pv_confidence before _compute_target(); effective_confidence = pv_confidence * pv_reliability_factor
+- [Phase 08-03]: RL bootstrap removed from main.py; ResidualRLAgent self-loads via __init__.load() and the old imitation bootstrap was DQNAgent-specific
+- [Phase 08-03]: _action_to_str() returns compound "bat_X/ev_Y" string for ReactionTimingTracker; richer signal than battery-only
 
 ### Pending Todos
 
@@ -106,6 +112,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 08-01-PLAN.md — ResidualRLAgent + Comparator Extension implemented
-Resume file: .planning/phases/08-residual-rl-and-learning/08-01-SUMMARY.md
-Next: Execute Phase 8 Plan 03 (RL agent wiring into main.py)
+Stopped at: Completed 08-03-PLAN.md — ReactionTimingTracker + All Phase 8 Learner Wiring implemented
+Resume file: .planning/phases/08-residual-rl-and-learning/08-03-SUMMARY.md
+Next: Execute Phase 8 Plan 04 (Dashboard "Lernen" tab with RL widget, GET /rl-learning endpoint)
