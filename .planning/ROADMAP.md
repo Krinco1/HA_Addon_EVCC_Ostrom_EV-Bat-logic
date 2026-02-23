@@ -213,4 +213,4 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 5. Dynamic Buffer | 2/2 | Complete   | 2026-02-23 |
 | 6. Decision Transparency | 2/3 | Complete    | 2026-02-23 |
 | 7. Driver Interaction | 3/3 | Complete    | 2026-02-23 |
-| 8. Residual RL and Learning | 0/4 | Planned | - |
+| 8. Residual RL and Learning | 1/4 | In Progress|  |
