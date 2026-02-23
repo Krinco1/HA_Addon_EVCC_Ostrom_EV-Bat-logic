@@ -401,6 +401,11 @@ def main():
             if forecast_reliability is not None:
                 pv_reliability = forecast_reliability.get_confidence("pv")
 
+            # --- Phase 8.1: Seasonal cost correction ---
+            _seasonal_corr = _seasonal_correction_eur(seasonal_learner, datetime.now(timezone.utc))
+            if _seasonal_corr != 0.0:
+                log("info", f"Seasonal correction: {_seasonal_corr:+.4f} EUR/kWh applied to LP objective")
+
             # --- Phase 4: Predictive Planner (LP-based) ---
             plan = None
             if horizon_planner is not None and consumption_96 is not None and pv_96 is not None:
@@ -411,6 +416,7 @@ def main():
                     pv_96=pv_96,
                     ev_departure_times=_get_departure_times(departure_store, cfg, state),
                     confidence_factors=confidence_factors,
+                    seasonal_correction_eur=_seasonal_corr,
                 )
 
             # --- Phase 7: Check Boost Charge override ---
@@ -626,6 +632,7 @@ def main():
                                 pv_96=pv_96,
                                 ev_departure_times=_get_departure_times(departure_store, cfg, state),
                                 confidence_factors=confidence_factors,
+                                seasonal_correction_eur=_seasonal_corr,
                             )
                             if plan and plan.slots:
                                 lp_action = _action_from_plan(plan, state)
@@ -870,6 +877,33 @@ def _check_notification_triggers(notifier, driver_mgr, sequencer, all_vehicles,
             f"Bedarf: {need_kwh:.0f} kWh bis {cfg.ev_target_soc}%"
         )
         notifier.send_charge_inquiry(name, soc, reason)
+
+
+_SEASONAL_DAMPING = 0.5        # Apply only 50% of historical error (conservative per user decision)
+_SEASONAL_CAP_EUR_KWH = 0.05  # Max correction +/-5ct/kWh (safety cap)
+
+
+def _seasonal_correction_eur(seasonal_learner, now: datetime) -> float:
+    """Return a dampened, capped seasonal cost correction (EUR/kWh).
+
+    Returns 0.0 when seasonal_learner is None or data is insufficient.
+    Positive = plan historically underestimated costs -> raise cost -> charge less.
+    Negative = plan historically overestimated costs -> lower cost -> charge more.
+
+    Note: mean_error_eur from SeasonalLearner is an approximate EUR-per-slot value.
+    The safety cap ensures the correction stays in a safe range regardless of exact
+    unit interpretation. This is consistent with the 'dampen toward neutral' approach.
+    """
+    if seasonal_learner is None:
+        return 0.0
+    try:
+        raw = seasonal_learner.get_correction_factor(now)
+    except Exception:
+        return 0.0
+    if raw is None:
+        return 0.0  # sparse data -- stay neutral
+    dampened = raw * _SEASONAL_DAMPING
+    return max(-_SEASONAL_CAP_EUR_KWH, min(_SEASONAL_CAP_EUR_KWH, dampened))
 
 
 def _current_slot_index() -> int:

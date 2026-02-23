@@ -97,6 +97,7 @@ class HorizonPlanner:
         pv_96: List[float],
         ev_departure_times: Dict[str, datetime],
         confidence_factors: Optional[Dict] = None,
+        seasonal_correction_eur: float = 0.0,
     ) -> Optional[PlanHorizon]:
         """Solve LP for the next 24h horizon.
 
@@ -114,6 +115,11 @@ class HorizonPlanner:
                 NOTE (Phase 8 research): Price confidence affects planning conservatism
                 via DynamicBufferCalc (not LP coefficients directly). Only "pv" is applied
                 to the LP objective. See Phase 8 RESEARCH.md Open Question 1.
+            seasonal_correction_eur: Phase 8.1 dampened seasonal cost offset (EUR/kWh).
+                Applied to normal-cost charging slots only (not penalty slots).
+                Positive = raise cost (plan was historically cheap) -> charge less.
+                Negative = lower cost (plan was historically expensive) -> charge more.
+                0.0 when SeasonalLearner has insufficient data (sparse cells).
 
         Returns:
             PlanHorizon with 96 DispatchSlots on success, None on any failure.
@@ -138,10 +144,11 @@ class HorizonPlanner:
             if state.ev_connected:
                 self._check_ev_feasibility(state, price_96, ev_departure_times, now)
 
-            # Step 3: Solve LP (pass pv_confidence_factor for objective scaling)
+            # Step 3: Solve LP (pass pv_confidence_factor and seasonal_correction_eur)
             result = self._solve_lp(
                 state, price_96, consumption_96, pv_96, ev_departure_times, now,
                 pv_confidence_factor=pv_confidence_factor,
+                seasonal_correction_eur=seasonal_correction_eur,
             )
             if result is None:
                 return None
@@ -228,6 +235,7 @@ class HorizonPlanner:
         ev_departure_times: Dict[str, datetime],
         now: datetime,
         pv_confidence_factor: float = 1.0,
+        seasonal_correction_eur: float = 0.0,
     ):
         """Build and solve the LP for joint battery + EV dispatch.
 
@@ -236,6 +244,9 @@ class HorizonPlanner:
                 Applied to the PV surplus reduction in the objective: a lower factor means
                 the planner trusts PV forecasts less, reducing PV coverage benefit and
                 acting more conservatively with PV-driven free charging.
+            seasonal_correction_eur: Phase 8.1 dampened seasonal cost offset (EUR/kWh).
+                Added to effective_price in normal-cost else branches only (not penalty slots).
+                Penalty slots (price * 10.0) gate out over-price charging and must be unchanged.
 
         Variable layout (T=96, N_vars = 5*T+2 = 482):
             bat_charge[t]    [i_bat_chg, i_bat_chg+T)   kW battery charge
@@ -300,15 +311,15 @@ class HorizonPlanner:
             # (LP upper-bound enforcement via objective — acts as soft price gate)
             if price_96[t] > self._bat_max_price:
                 # Heavy penalty to prevent battery charging above user's max price
-                c[i_bat_chg + t] = price_96[t] * 10.0
+                c[i_bat_chg + t] = price_96[t] * 10.0  # penalty -- no seasonal offset
             else:
-                c[i_bat_chg + t] = effective_price
+                c[i_bat_chg + t] = effective_price + seasonal_correction_eur  # Phase 8.1
 
             if price_96[t] > self._ev_max_price and ev_connected:
                 # Heavy penalty to prevent EV charging above user's max price
-                c[i_ev_chg + t] = price_96[t] * 10.0
+                c[i_ev_chg + t] = price_96[t] * 10.0   # penalty -- no seasonal offset
             else:
-                c[i_ev_chg + t] = effective_price
+                c[i_ev_chg + t] = effective_price + seasonal_correction_eur  # Phase 8.1
 
             # Discharge revenue: negative cost (HiGHS minimizes, so negative = good)
             c[i_bat_dis + t] = -self._feed_in
