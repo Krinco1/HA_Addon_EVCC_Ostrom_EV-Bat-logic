@@ -153,12 +153,12 @@ Plans:
   2. Clicking (or hovering on) any plan slot shows a human-readable explanation: "Charging Kia now because price is in the bottom 20% of forecast and departure is in 6h — waiting would cost an estimated 1.40 EUR more"
   3. A second dashboard tab shows a historical comparison: for each past decision cycle, what the plan said would happen vs what the optimizer actually did vs what evcc reported as the outcome
   4. Explanations are generated from the LP dual variables and slot context — they reference actual numbers (price rank, hours to departure, cost delta), not generic phrases
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: Implement plan timeline visualization: plotly Gantt chart with price overlay embedded in dashboard via fig.to_json(); progressive disclosure (next 6h default, zoom to 24h/48h)
-- [ ] 06-02: Implement per-slot decision explanation generator: extract LP dual variables and slot context, format human-readable "why" text per DispatchSlot, store in PlanHorizon
-- [ ] 06-03: Implement planned-vs-actual comparison tab: store plan snapshots in InfluxDB per cycle, compare against actual evcc outcomes, render comparison table in dashboard
+- [ ] 06-01-PLAN.md — ExplanationGenerator class, GET /plan endpoint, 3-tab dashboard navigation
+- [ ] 06-02-PLAN.md — SVG Gantt chart with price overlay, hover tooltips, click-detail explanations
+- [ ] 06-03-PLAN.md — PlanSnapshotter for InfluxDB, GET /history endpoint, Historie tab with overlay chart and cost-deviation table
 
 ### Phase 7: Driver Interaction
 **Goal**: Drivers can always override the plan immediately, the system proactively asks about departure times via Telegram, and multi-EV priority reflects actual driver needs rather than just SoC ranking
