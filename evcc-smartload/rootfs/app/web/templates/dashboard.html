@@ -199,10 +199,26 @@
         .buffer-log-obs { opacity: 0.6; font-style: italic; }
         .btn-sm { background: #0f3460; color: #ffdd88; border: 1px solid #ffaa00; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em; white-space: nowrap; }
         .btn-sm:hover { background: #1a2e5e; }
+
+        /* Phase 6: Tab navigation */
+        .tab-nav { display:flex; gap:4px; margin-bottom:12px; padding:0 8px; }
+        .tab-btn { padding:8px 16px; border:1px solid var(--border, #444); background:var(--card-bg, #1a1a2e); color:var(--text, #e0e0e0); border-radius:6px 6px 0 0; cursor:pointer; font-size:14px; border-bottom:none; }
+        .tab-btn.active { background:var(--accent, #00d4aa); color:#000; font-weight:bold; }
+        .tab-panel { /* layout handled by existing card styles */ }
     </style>
 </head>
 <body>
 <div class="container">
+    <!-- Phase 6: Tab navigation -->
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('main')">Status</button>
+        <button class="tab-btn" onclick="switchTab('plan')">Plan</button>
+        <button class="tab-btn" onclick="switchTab('history')">Historie</button>
+    </div>
+
+    <!-- Tab: Status (existing content wrapped) -->
+    <div id="tab-main" class="tab-panel">
+
     <!-- v7: HA Entity Warning Banner (shown when unconfigured entities detected) -->
     <div id="haWarningBanner" class="ha-warning-banner" style="display:none;">
         <span class="warning-icon">&#9888;</span>
@@ -356,9 +372,24 @@
         API: <a href="/status">/status</a> | <a href="/slots">/slots</a> | <a href="/vehicles">/vehicles</a> |
         <a href="/rl-devices">/rl-devices</a> | <a href="/chart-data">/chart-data</a> | <a href="/strategy">/strategy</a> |
         <a href="/decisions">/decisions</a> | <a href="/sequencer">/sequencer</a> | <a href="/drivers">/drivers</a> |
-        <a href="/forecast">/forecast</a>
+        <a href="/forecast">/forecast</a> | <a href="/plan">/plan</a>
         <br>Auto-refresh alle 60 Sekunden
     </div>
+
+    </div><!-- end tab-main -->
+
+    <!-- Tab: Plan (Phase 6 — Gantt chart rendered by Plan 02) -->
+    <div id="tab-plan" class="tab-panel" style="display:none;">
+        <div class="chart-card"><h2>24h Plan-Timeline</h2><div id="planChartWrap"></div><div id="planDetail" style="display:none;"></div></div>
+        <div id="planNoData" style="display:none;" class="chart-card"><p>Kein Plan verfügbar &mdash; LP läuft noch oder ist nicht aktiv.</p></div>
+    </div>
+
+    <!-- Tab: Historie (Phase 6 — Plan vs. Actual comparison, rendered by Plan 03) -->
+    <div id="tab-history" class="tab-panel" style="display:none;">
+        <div id="historyContent"></div>
+        <div id="historyNoData" style="display:none;" class="chart-card"><p>Keine historischen Daten verfügbar.</p></div>
+    </div>
+
 </div>
 
 <!-- Manual SoC modal -->
@@ -399,5 +430,20 @@
 </div>
 
 <script src="/static/app.js"></script>
+<script>
+// Phase 6: Tab navigation — switchTab is also defined in app.js for Plan/History loading.
+// This inline version handles basic tab switching before app.js extensions are added.
+if (typeof switchTab === 'undefined') {
+    function switchTab(name) {
+        ['main', 'plan', 'history'].forEach(function(t) {
+            var el = document.getElementById('tab-' + t);
+            if (el) el.style.display = (t === name ? '' : 'none');
+        });
+        document.querySelectorAll('.tab-btn').forEach(function(b, i) {
+            b.classList.toggle('active', ['main', 'plan', 'history'][i] === name);
+        });
+    }
+}
+</script>
 </body>
 </html>
