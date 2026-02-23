@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 8 (Residual RL and Learning) — ALL PLANS COMPLETE (08-01 through 08-05)
+**Current focus:** Phase 8.1 (Seasonal Feedback Verification) — ALL PLANS COMPLETE (08.1-01)
 
 ## Current Position
 
-Phase: 8 of 8 (Residual RL and Learning)
-Plan: 5 of 5 in current phase — 08-05 complete (Fixed audit checklist array-vs-dict mismatch in Lernen tab)
-Status: ALL PHASE 8 PLANS COMPLETE — Full RL learning stack operational with gap closure: constraint audit checklist correctly reflects individual pass/fail from server; Lernen tab fully operational
-Last activity: 2026-02-23 — Phase 8 Plan 05 executed (185b38e)
+Phase: 8.1 of 8.1 (Seasonal Feedback Verification)
+Plan: 1 of 1 in current phase — 08.1-01 complete (Seasonal LP wiring + Phase 5 VERIFICATION.md)
+Status: ALL PHASE 8.1 PLANS COMPLETE — LERN-02 closed (seasonal corrections flow into LP); PLAN-03 closed (Phase 5 VERIFICATION.md with 15 truths, 6 artifacts, 7 links all PASS); v1.0 audit fully satisfied
+Last activity: 2026-02-24 — Phase 8.1 Plan 01 executed (8e95188)
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [██████████] 99%
 | Phase 08-residual-rl-and-learning P08-03 | 6 | 2 tasks | 4 files |
 | Phase 08 P04 | 3 | 2 tasks | 3 files |
 | Phase 08-residual-rl-and-learning P05 | 1 | 1 tasks | 1 files |
+| Phase 08.1 P01 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ Recent decisions affecting current work:
 - [Phase 08-05]: check.name preferred over auditLabels[ci] as display label — server provides German label directly; auditLabels kept as fallback
 - [Phase 08-05]: data.audit.all_passed used directly instead of computing allPassed in JS — server already aggregates
 - [Phase 08-05]: check.detail exposed as title attribute for hover tooltip — zero layout cost, useful for diagnosis
+- [Phase 08.1]: 50% dampening + 0.05 EUR/kWh cap applied to SeasonalLearner corrections before LP injection (conservative per user decision)
+- [Phase 08.1]: Seasonal correction applied to normal-cost else branches only; penalty slots (price*10.0) and discharge slots unchanged
 
 ### Pending Todos
 
@@ -118,7 +121,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23
-Stopped at: Completed 08-05-PLAN.md — Fixed constraint audit checklist array-vs-dict mismatch (gap closure)
-Resume file: .planning/phases/08-residual-rl-and-learning/08-05-SUMMARY.md
-Next: All Phase 8 plans complete — project v1.0 ready for deployment and 30-day shadow period observation; audit checklist fully operational
+Last session: 2026-02-24
+Stopped at: Completed 08.1-01-PLAN.md — LERN-02 (seasonal correction wired into LP objective) and PLAN-03 (Phase 5 VERIFICATION.md) both closed
+Resume file: .planning/phases/08.1-seasonal-feedback-verification/08.1-01-SUMMARY.md
+Next: All plans complete — project v1.0 audit fully satisfied (21/21 requirements); ready for deployment and 30-day shadow period observation

@@ -19,7 +19,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 
 - [x] **PLAN-01**: System erstellt einen 24-48h Rolling-Horizon Energieplan der Batterie und EV gemeinsam optimiert
 - [x] **PLAN-02**: Statische Euro-Ladegrenzen (ev_max_price_ct, battery_max_price_ct) werden durch dynamische planbasierte Optimierung ersetzt
-- [ ] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
+- [x] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
 - [x] **PLAN-04**: Hausverbrauch wird aus HA-Datenbank/InfluxDB-Historie hochgerechnet und in Planung berücksichtigt
 - [x] **PLAN-05**: PV-Ertragsprognose wird via evcc Solar-Tariff API bezogen und in den 24-48h Plan integriert
 
@@ -39,7 +39,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 ### Lernendes System
 
 - [x] **LERN-01**: RL-Agent lernt Korrekturen zum Planer (Residual Learning) statt eigenständige Entscheidungen
-- [ ] **LERN-02**: System erkennt und adaptiert saisonale Muster (Verbrauch, PV-Ertrag, Preisverhalten über Jahreszeiten)
+- [x] **LERN-02**: System erkennt und adaptiert saisonale Muster (Verbrauch, PV-Ertrag, Preisverhalten über Jahreszeiten)
 - [x] **LERN-03**: System lernt angemessene Reaktionszeiten (wann Plan sofort anpassen vs Abweichung abwarten)
 - [x] **LERN-04**: System lernt die Zuverlässigkeit aller Prognosen (PV, Preis, Verbrauch) und korrigiert künftige Planungen mit Konfidenz-Faktoren
 
