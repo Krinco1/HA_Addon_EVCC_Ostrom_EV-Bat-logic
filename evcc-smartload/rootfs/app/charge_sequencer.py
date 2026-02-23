@@ -77,6 +77,8 @@ class ChargeSequencer:
             end_hour=cfg.quiet_hours_end,
         )
         self._last_applied_vehicle: Optional[str] = None
+        # Phase 7 Plan 03: injected by main.py (late-assignment pattern)
+        self.departure_store = None
 
     # ------------------------------------------------------------------
     # Request management
@@ -168,6 +170,61 @@ class ChargeSequencer:
         self.schedule = schedule
         return schedule
 
+    # ------------------------------------------------------------------
+    # Urgency scoring (Phase 7 Plan 03)
+    # ------------------------------------------------------------------
+
+    def _urgency_score(self, req: "ChargeRequest", now: datetime) -> float:
+        """Compute urgency = SoC deficit / hours to departure.
+
+        Higher score = more urgent charging need.
+
+        Design decisions:
+        - 0.5h floor prevents division by near-zero for imminent departures.
+        - Past departures (already gone) are treated as "no deadline" → 12h default
+          window (per Phase 7 Research Pitfall 3: avoid inflating urgency for expired
+          entries).
+        """
+        _DEFAULT_HOURS = 12.0
+        _MIN_HOURS = 0.5
+
+        if self.departure_store is not None:
+            departure = self.departure_store.get(req.vehicle_name)
+            hours_remaining = (departure - now).total_seconds() / 3600
+            if hours_remaining <= 0:
+                # Past departure — treat as no deadline
+                hours_remaining = _DEFAULT_HOURS
+            else:
+                hours_remaining = max(_MIN_HOURS, hours_remaining)
+        else:
+            hours_remaining = _DEFAULT_HOURS
+
+        soc_deficit = max(0.0, req.target_soc - req.current_soc)
+        return soc_deficit / hours_remaining
+
+    def _urgency_reason(self, req: "ChargeRequest", now: datetime) -> str:
+        """Return a short German string explaining the urgency score."""
+        _DEFAULT_HOURS = 12.0
+
+        if self.departure_store is not None:
+            departure = self.departure_store.get(req.vehicle_name)
+            hours_remaining = (departure - now).total_seconds() / 3600
+            if hours_remaining <= 0:
+                # Past departure — treat as default
+                return f"Standard-Abfahrt {self.departure_store._default_hour}:00, SoC {req.current_soc:.0f}%"
+            else:
+                hours_remaining = max(0.5, hours_remaining)
+                # Check whether this is a user-provided departure or the default
+                with self.departure_store._lock:
+                    iso = self.departure_store._times.get(req.vehicle_name)
+                if iso:
+                    return f"Abfahrt in {hours_remaining:.0f}h, SoC {req.current_soc:.0f}%"
+                else:
+                    return f"Standard-Abfahrt {self.departure_store._default_hour}:00, SoC {req.current_soc:.0f}%"
+        else:
+            soc_deficit = max(0.0, req.target_soc - req.current_soc)
+            return f"SoC {req.current_soc:.0f}%, Bedarf {soc_deficit:.0f}%"
+
     def _rank_vehicles(
         self,
         pending: List[ChargeRequest],
@@ -175,23 +232,27 @@ class ChargeSequencer:
         solar_hours: List[Tuple[datetime, float]],
         now: datetime,
     ) -> List[ChargeRequest]:
+        """Rank vehicles by urgency (SoC deficit / hours to departure).
+
+        Priority modifiers:
+        - Connected vehicle: +5.0 tie-break (avoid unnecessary wallbox swap).
+        - Quiet hours: +1000.0 absolute priority for connected vehicle (preserves
+          quiet hours rule — never switch wallbox during night).
+        """
         for req in pending:
-            req.priority = 0
+            req.priority = self._urgency_score(req, now)
 
+            # Connected vehicle tie-break (avoid unnecessary wallbox swap)
             if req.vehicle_name == connected_vehicle:
-                req.priority += 30  # already plugged in → no switch needed
+                req.priority += 5.0
 
-            solar_available = sum(kw for _, kw in solar_hours)
-            if solar_available > req.need_kwh * 1.3:
-                req.priority -= 20  # can wait for solar
-
-            if req.hours_needed < 3:
-                req.priority += 15  # small need finishes quickly
-
+            # Quiet hours: absolute priority for connected vehicle
             if self._is_quiet(now) and req.vehicle_name == connected_vehicle:
-                req.priority += 100  # quiet hours: stay with current vehicle
+                req.priority += 1000.0
 
-        return sorted(pending, key=lambda r: r.priority, reverse=True)
+        sorted_pending = sorted(pending, key=lambda r: r.priority, reverse=True)
+        log("info", f"ChargeSequencer: urgency ranking: {[(r.vehicle_name, round(r.priority, 2)) for r in sorted_pending]}")
+        return sorted_pending
 
     def _assign_time_windows(
         self,
@@ -340,9 +401,19 @@ class ChargeSequencer:
             for s in self.schedule
         ]
 
-    def get_requests_summary(self) -> Dict:
-        return {
-            v: {
+    def get_requests_summary(self) -> List[Dict]:
+        """Return list of charge request dicts with urgency information.
+
+        Returns a list (not dict) so the dashboard JS can iterate with .length
+        and index access. Each entry has a 'vehicle' key for identification.
+
+        Phase 7 Plan 03: adds urgency_score, departure_time, urgency_reason per vehicle.
+        """
+        now = datetime.now(timezone.utc)
+        result = []
+        for v, r in self.requests.items():
+            entry = {
+                "vehicle": v,
                 "driver": r.driver_name,
                 "target_soc": r.target_soc,
                 "current_soc": round(r.current_soc, 0),
@@ -350,9 +421,20 @@ class ChargeSequencer:
                 "hours_needed": round(r.hours_needed, 1),
                 "status": r.status,
                 "confirmed_at": r.confirmed_at.isoformat(),
+                "priority": round(r.priority, 2),
+                # Phase 7 Plan 03: urgency fields
+                "urgency_score": round(self._urgency_score(r, now), 2),
+                "urgency_reason": self._urgency_reason(r, now),
+                "departure_time": (
+                    self.departure_store.get(v).isoformat()
+                    if self.departure_store is not None
+                    else None
+                ),
             }
-            for v, r in self.requests.items()
-        }
+            result.append(entry)
+        # Sort by urgency_score descending so dashboard always shows highest urgency first
+        result.sort(key=lambda e: e["urgency_score"], reverse=True)
+        return result
 
     def get_quiet_hours_status(self, now: datetime) -> Dict:
         is_quiet = self._is_quiet(now)

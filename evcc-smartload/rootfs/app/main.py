@@ -190,10 +190,13 @@ def main():
     except Exception as e:
         log("warning", f"DepartureTimeStore: init failed ({e}), departure queries disabled")
 
-    # Inject departure_store into notifier and web server
+    # Inject departure_store into notifier, web server, and sequencer
     if notifier is not None and departure_store is not None:
         notifier.departure_store = departure_store
     web.departure_store = departure_store
+    # Phase 7 Plan 03: urgency scoring needs departure times
+    if sequencer is not None and departure_store is not None:
+        sequencer.departure_store = departure_store
 
     # --- RL bootstrap ---
     if not rl_agent.load():
