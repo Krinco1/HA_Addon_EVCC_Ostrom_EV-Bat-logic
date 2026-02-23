@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Dict, List, Optional
+from urllib.parse import urlparse, parse_qs
 
 from config import Config
 from explanation_generator import ExplanationGenerator
@@ -84,6 +85,8 @@ class WebServer:
         self.buffer_calc = buffer_calc
         # Phase 6: explanation generator for /plan endpoint
         self.explanation_gen = ExplanationGenerator()
+        # Phase 6: plan snapshotter for /history endpoint (wired late by main.py)
+        self.plan_snapshotter = None
 
     # ------------------------------------------------------------------
     # Start
@@ -232,6 +235,22 @@ class WebServer:
                         self._json({"available": False, "slots": []})
                     else:
                         self._json(srv._api_plan(plan))
+                # Phase 6: history endpoint (planned vs actual comparison)
+                elif path == "/history":
+                    hours = 24
+                    if "?" in self.path:
+                        qs = parse_qs(urlparse(self.path).query)
+                        try:
+                            hours = int(qs.get("hours", ["24"])[0])
+                            if hours not in (24, 168):
+                                hours = 24
+                        except (ValueError, TypeError):
+                            hours = 24
+                    if srv.plan_snapshotter is None:
+                        self._json({"available": False, "rows": [], "reason": "snapshotter not initialized"})
+                    else:
+                        rows = srv.plan_snapshotter.query_comparison(hours)
+                        self._json({"available": bool(rows), "hours": hours, "rows": rows})
                 elif path == "/docs":
                     self._html(srv._docs_index())
                 elif path.startswith("/docs/"):

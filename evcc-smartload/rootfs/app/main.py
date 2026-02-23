@@ -40,6 +40,7 @@ from vehicle_monitor import DataCollector, VehicleMonitor
 from charge_sequencer import ChargeSequencer
 from driver_manager import DriverManager
 from web import WebServer
+from plan_snapshotter import PlanSnapshotter
 
 
 def main():
@@ -95,6 +96,7 @@ def main():
     # --- Core infrastructure (only reached if no critical config errors) ---
     evcc = EvccClient(cfg)
     influx = InfluxDBClient(cfg)
+    plan_snapshotter = PlanSnapshotter(influx)
     manual_store = ManualSocStore()
 
     # --- v7: Forecasters (Phase 3) ---
@@ -204,6 +206,7 @@ def main():
     web.driver_mgr = driver_mgr
     web.notifier = notifier
     web.buffer_calc = buffer_calc
+    web.plan_snapshotter = plan_snapshotter
 
     # --- Main decision loop ---
     last_state: Optional[SystemState] = None
@@ -294,6 +297,15 @@ def main():
             if plan is not None:
                 lp_action = _action_from_plan(plan, state)
                 store.update_plan(plan)
+                try:
+                    actual_state = {
+                        "battery_power": state.battery_power,
+                        "ev_power": state.ev_power,
+                        "current_price": state.current_price,
+                    }
+                    plan_snapshotter.write_snapshot(plan, actual_state)
+                except Exception as e:
+                    log("warning", f"plan_snapshotter.write_snapshot error: {e}")
                 log("info", f"Decision: LP plan (cost={plan.solver_fun:.4f} EUR), "
                              f"bat={'charge' if plan.current_bat_charge else 'discharge' if plan.current_bat_discharge else 'hold'}, "
                              f"ev={'charge' if plan.current_ev_charge else 'off'}")
