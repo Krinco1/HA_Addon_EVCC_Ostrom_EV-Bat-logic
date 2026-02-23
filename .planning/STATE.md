@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 6 (Decision Transparency) — Plan 02 complete
+**Current focus:** Phase 6 (Decision Transparency) — Plan 03 complete (Phase 6 DONE)
 
 ## Current Position
 
 Phase: 6 of 8 (Decision Transparency)
-Plan: 2 of 3 in current phase — 06-02 complete
-Status: SVG Gantt chart with color-coded bars, price overlay, hover tooltips, click-detail complete (73d0e39)
-Last activity: 2026-02-23 — Phase 6 Plan 02 executed (73d0e39)
+Plan: 3 of 3 in current phase — 06-03 complete (Phase 6 fully complete)
+Status: PlanSnapshotter writes slot-0 snapshots to InfluxDB; /history endpoint serves planned-vs-actual with cost_delta_eur; Historie tab shows SVG overlay chart + cost-deviation table (4e163b5)
+Last activity: 2026-02-23 — Phase 6 Plan 03 executed (4e163b5)
 
-Progress: [█████████░] 82%
+Progress: [██████████] 88%
 
 ## Performance Metrics
 
@@ -37,11 +37,11 @@ Progress: [█████████░] 82%
 | Phase 05 P01 | 1 | 12 min | 12 min |
 | Phase 05 P02 | 1 | 4 min | 4 min |
 | Phase 06 P01 | 1 | 5 min | 5 min |
-
 | Phase 06 P02 | 1 | 8 min | 8 min |
+| Phase 06 P03 | 1 | 4 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min, 12 min, 4 min, 5 min, 8 min
+- Last 5 plans: 12 min, 4 min, 5 min, 8 min, 4 min
 - Trend: stable
 
 ## Accumulated Context
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - [Phase 06-01]: switchTab() defined as inline fallback in dashboard.html with 'if typeof === undefined' guard — app.js overrides in Plan 02 with full implementation
 - [Phase 06]: Transparent hit-area rects for hold/idle slots ensure all 96 slots respond to hover/click in Gantt chart
 - [Phase 06]: renderPlanGantt() uses SVG string-concatenation pattern matching renderChart()/renderForecastChart() — lazy-loaded by switchTab('plan')
+- [Phase 06-03]: PlanSnapshotter uses direct requests.get() (not InfluxDBClient query helpers) for smartload_plan_snapshot — cleaner column parsing for new measurement
+- [Phase 06-03]: query_comparison() converts actual_bat_power_w to kW server-side (returns actual_bat_power_kw) — consistent kW units with planned fields in JS
+- [Phase 06-03]: cost_delta_eur approximation: (actual_price_ct - planned_price_ct) / 100 * planned_bat_charge_kw * 0.25 — 15-min slot energy cost difference
 
 ### Pending Todos
 
@@ -80,5 +83,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 06-02-PLAN.md — SVG Gantt chart with price overlay, hover tooltips, click-detail
-Next: Execute 06-03-PLAN.md — Historie tab: Plan vs. Actual comparison
+Stopped at: Completed 06-03-PLAN.md — Phase 6 fully complete (PlanSnapshotter, /history endpoint, Historie tab)
+Next: Phase 7 (Driver Interaction) or Phase 8 (RL Advisory)

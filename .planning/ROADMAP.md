@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4.2: CI/CD Pipeline** - GitHub Actions multi-arch container build and push to GHCR (INSERTED — gap closure) (completed 2026-02-22)
 - [x] **Phase 4.3: Release Documentation** - CHANGELOG.md and README.md updated for Phases 1-4 features (INSERTED — gap closure) (completed 2026-02-23)
 - [x] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day (completed 2026-02-23)
-- [ ] **Phase 6: Decision Transparency** - Dashboard shows 24-48h plan timeline, per-slot decision explanations, and planned-vs-actual historical comparison
+- [x] **Phase 6: Decision Transparency** - Dashboard shows 24-48h plan timeline, per-slot decision explanations, and planned-vs-actual historical comparison (completed 2026-02-23)
 - [ ] **Phase 7: Driver Interaction** - Manual override from dashboard and Telegram, proactive departure-time queries, and driver-context-aware multi-EV prioritization
 - [ ] **Phase 8: Residual RL and Learning** - RL agent refactored to delta corrections on planner output, seasonal learner deployed, forecast calibration with confidence factors, RL vs planner comparison in dashboard
 
@@ -157,8 +157,8 @@ Plans:
 
 Plans:
 - [x] 06-01-PLAN.md — ExplanationGenerator class, GET /plan endpoint, 3-tab dashboard navigation (completed 2026-02-23)
-- [ ] 06-02-PLAN.md — SVG Gantt chart with price overlay, hover tooltips, click-detail explanations
-- [ ] 06-03-PLAN.md — PlanSnapshotter for InfluxDB, GET /history endpoint, Historie tab with overlay chart and cost-deviation table
+- [x] 06-02-PLAN.md — SVG Gantt chart with price overlay, hover tooltips, click-detail explanations (completed 2026-02-23)
+- [x] 06-03-PLAN.md — PlanSnapshotter for InfluxDB, GET /history endpoint, Historie tab with overlay chart and cost-deviation table (completed 2026-02-23)
 
 ### Phase 7: Driver Interaction
 **Goal**: Drivers can always override the plan immediately, the system proactively asks about departure times via Telegram, and multi-EV priority reflects actual driver needs rather than just SoC ranking
