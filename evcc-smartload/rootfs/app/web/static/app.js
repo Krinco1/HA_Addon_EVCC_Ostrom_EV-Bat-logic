@@ -1085,6 +1085,259 @@ function updateHaWarnings(warnings) {
 }
 
 // =============================================================================
+// v8: Dynamic Buffer — buffer section, chart, event log
+// =============================================================================
+
+/**
+ * Update the dynamic buffer section from SSE/polled data.
+ * buffer: object from data.buffer in SSE payload
+ */
+function updateBufferSection(buffer) {
+    if (!buffer) return;
+
+    var card = $('bufferCard');
+    var banner = $('bufferObsBanner');
+    if (card) card.style.display = 'block';
+
+    // Observation banner
+    if (banner) {
+        if (buffer.mode === 'observation') {
+            var days = buffer.days_remaining != null ? buffer.days_remaining : '?';
+            var obsText = $('bufferObsText');
+            if (obsText) obsText.textContent = 'Beobachtungsmodus \u2014 noch ' + days + ' Tage';
+            banner.style.display = 'flex';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    // Confidence widget — update from last log entry
+    var log = buffer.log_recent;
+    var lastEntry = (log && log.length > 0) ? log[log.length - 1] : null;
+
+    var confEl = $('confValue');
+    var bufferValEl = $('bufferValue');
+    var bufferModeEl = $('bufferMode');
+
+    if (confEl) confEl.textContent = lastEntry ? lastEntry.pv_confidence.toFixed(0) : '--';
+    if (bufferValEl) bufferValEl.textContent = buffer.current_buffer_pct != null ? buffer.current_buffer_pct : '--';
+    if (bufferModeEl) bufferModeEl.textContent = buffer.mode === 'observation' ? 'Beobachtung' : 'Live';
+
+    if (lastEntry) {
+        var spreadEl = $('confSpread');
+        var pv4hEl = $('confPv4h');
+        var hourEl = $('confHour');
+        if (spreadEl) spreadEl.textContent = lastEntry.price_spread_ct != null ? lastEntry.price_spread_ct.toFixed(1) : '--';
+        if (pv4hEl) pv4hEl.textContent = lastEntry.expected_pv_kw != null ? lastEntry.expected_pv_kw.toFixed(1) : '--';
+        if (hourEl) hourEl.textContent = lastEntry.hour_of_day != null ? lastEntry.hour_of_day + ':00' : '--';
+    }
+
+    if (log) {
+        renderBufferChart(log);
+        renderBufferLog(log);
+    }
+}
+
+/**
+ * Render the buffer history line chart as SVG into #bufferChart.
+ * Shows new_buffer_pct over time with reference lines at 10% and 20%.
+ * Observation-mode entries drawn with lower opacity/dashed style.
+ */
+function renderBufferChart(logEntries) {
+    var svg = $('bufferChart');
+    if (!svg || !logEntries || logEntries.length === 0) return;
+
+    var W = 960, H = 160;
+    var marginL = 36, marginR = 12, marginT = 10, marginB = 24;
+    var plotW = W - marginL - marginR;
+    var plotH = H - marginT - marginB;
+
+    var n = logEntries.length;
+    var minY = 0, maxY = 100;
+
+    function xPos(i) { return marginL + (i / Math.max(1, n - 1)) * plotW; }
+    function yPos(pct) { return marginT + plotH - (Math.min(maxY, Math.max(minY, pct)) / maxY) * plotH; }
+
+    var s = '';
+
+    // Y-axis grid lines and labels
+    var yLabels = [0, 20, 50, 100];
+    for (var li = 0; li < yLabels.length; li++) {
+        var yv = yLabels[li];
+        var gy = yPos(yv);
+        s += '<line x1="' + marginL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - marginR) + '" y2="' + gy.toFixed(1) + '" stroke="#2a2a4a" stroke-width="0.8" stroke-dasharray="3,3"/>';
+        s += '<text x="' + (marginL - 4) + '" y="' + (gy + 3).toFixed(1) + '" fill="#555" font-size="9" text-anchor="end" font-family="sans-serif">' + yv + '%</text>';
+    }
+
+    // Reference lines: 20% practical minimum (amber) and 10% hard floor (red)
+    var y20 = yPos(20);
+    var y10 = yPos(10);
+    s += '<line x1="' + marginL + '" y1="' + y20.toFixed(1) + '" x2="' + (W - marginR) + '" y2="' + y20.toFixed(1) + '" stroke="#ffaa00" stroke-width="1" stroke-dasharray="4,3" opacity="0.7"/>';
+    s += '<text x="' + (marginL + 4) + '" y="' + (y20 - 3).toFixed(1) + '" fill="#ffaa00" font-size="8" font-family="sans-serif">20% Min</text>';
+    s += '<line x1="' + marginL + '" y1="' + y10.toFixed(1) + '" x2="' + (W - marginR) + '" y2="' + y10.toFixed(1) + '" stroke="#ff4444" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>';
+    s += '<text x="' + (marginL + 4) + '" y="' + (y10 - 3).toFixed(1) + '" fill="#ff4444" font-size="8" font-family="sans-serif">10% Boden</text>';
+
+    // Split into segments by observation vs live mode for different styling
+    // Build polyline segments
+    var livePts = '';
+    var obsPts = '';
+    for (var i = 0; i < n; i++) {
+        var e = logEntries[i];
+        var x = xPos(i).toFixed(1);
+        var y = yPos(e.new_buffer_pct).toFixed(1);
+        var pt = x + ',' + y + ' ';
+        if (e.mode === 'observation' || e.applied === false) {
+            obsPts += (obsPts === '' ? 'M' : 'L') + pt;
+            if (livePts !== '') {
+                // Close live segment before starting obs
+            }
+        } else {
+            livePts += (livePts === '' ? 'M' : 'L') + pt;
+        }
+    }
+
+    // Draw observation line (dashed, lower opacity)
+    if (obsPts) {
+        s += '<path d="' + obsPts + '" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,3" stroke-linejoin="round" opacity="0.5"/>';
+    }
+    // Draw live line (solid)
+    if (livePts) {
+        s += '<path d="' + livePts + '" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round" opacity="1"/>';
+    }
+    // If all same mode, draw single line for visual continuity
+    if (!obsPts && !livePts) {
+        var allPts = '';
+        for (var j = 0; j < n; j++) {
+            allPts += (j === 0 ? 'M' : 'L') + xPos(j).toFixed(1) + ',' + yPos(logEntries[j].new_buffer_pct).toFixed(1) + ' ';
+        }
+        s += '<path d="' + allPts + '" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round" opacity="0.7"/>';
+    }
+
+    // X-axis labels: ~every 24 entries (6h at 15-min intervals)
+    var labelStep = Math.max(1, Math.floor(n / 7));
+    for (var xi = 0; xi < n; xi += labelStep) {
+        var entry = logEntries[xi];
+        var lx = xPos(xi).toFixed(1);
+        var tsLabel = '';
+        if (entry.ts) {
+            try {
+                var d = new Date(entry.ts);
+                tsLabel = (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+            } catch(ex) { tsLabel = ''; }
+        }
+        if (tsLabel) {
+            s += '<text x="' + lx + '" y="' + (marginT + plotH + 14) + '" fill="#666" font-size="8" text-anchor="middle" font-family="sans-serif">' + tsLabel + '</text>';
+        }
+    }
+
+    svg.innerHTML = s;
+}
+
+/**
+ * Render the buffer event log table into #bufferLogBody.
+ * Most recent entries first, limit to last 50.
+ * Observation-mode rows: muted/italic CSS class buffer-log-obs.
+ */
+function renderBufferLog(logEntries) {
+    var tbody = $('bufferLogBody');
+    if (!tbody || !logEntries) return;
+
+    var entries = logEntries.slice(-50).reverse();  // most recent first
+    var html = '';
+    for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        var isObs = (e.mode === 'observation' || e.applied === false);
+        var rowClass = isObs ? ' class="buffer-log-obs"' : '';
+
+        // Time: HH:MM
+        var timeStr = '--';
+        if (e.ts) {
+            try {
+                var d = new Date(e.ts);
+                timeStr = (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+            } catch(ex) { timeStr = '--'; }
+        }
+
+        var confidence = e.pv_confidence != null ? e.pv_confidence.toFixed(0) + '%' : '--';
+        var spread = e.price_spread_ct != null ? e.price_spread_ct.toFixed(1) + 'ct' : '--';
+        var bufferChange = e.old_buffer_pct + '%\u2192' + e.new_buffer_pct + '%';
+        var reason = escapeHtml(e.reason || '');
+        var statusText = isObs
+            ? '<span style="color:#888;">Simulation</span>'
+            : '<span style="color:#22c55e;">&#10003; Aktiv</span>';
+
+        html += '<tr' + rowClass + '>';
+        html += '<td>' + timeStr + '</td>';
+        html += '<td>' + confidence + '</td>';
+        html += '<td>' + spread + '</td>';
+        html += '<td>' + bufferChange + '</td>';
+        html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + reason + '">' + reason + '</td>';
+        html += '<td>' + statusText + '</td>';
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+/**
+ * Toggle the collapsible confidence detail section.
+ */
+function toggleConfDetail() {
+    var detail = $('confDetail');
+    var summary = $('confSummary');
+    if (!detail) return;
+    var isVisible = detail.style.display !== 'none';
+    detail.style.display = isVisible ? 'none' : 'block';
+    // Update arrow icon
+    if (summary) {
+        var arrow = summary.querySelector('span:last-child');
+        if (arrow) arrow.textContent = isVisible ? '\u25BC Details' : '\u25B2 Details';
+    }
+}
+
+/**
+ * Activate live mode early via POST /buffer/activate-live.
+ */
+async function activateBufferLive() {
+    if (!confirm('Dynamischen Puffer jetzt live schalten? Die Beobachtungsphase wird beendet.')) return;
+    try {
+        var resp = await fetch('/buffer/activate-live', { method: 'POST' });
+        var data = await resp.json();
+        if (resp.ok) {
+            var banner = $('bufferObsBanner');
+            if (banner) banner.style.display = 'none';
+            var modeEl = $('bufferMode');
+            if (modeEl) modeEl.textContent = 'Live';
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    } catch (e) {
+        alert('Netzwerkfehler: ' + e.message);
+    }
+}
+
+/**
+ * Extend observation period by 14 days via POST /buffer/extend-obs.
+ */
+async function extendBufferObs() {
+    try {
+        var resp = await fetch('/buffer/extend-obs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: 14 }),
+        });
+        var data = await resp.json();
+        if (resp.ok) {
+            var obsText = $('bufferObsText');
+            if (obsText) obsText.textContent = 'Beobachtungsmodus \u2014 um 14 Tage verl\u00E4ngert';
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    } catch (e) {
+        alert('Netzwerkfehler: ' + e.message);
+    }
+}
+
+// =============================================================================
 // v6: SSE — Live state push
 // =============================================================================
 
@@ -1190,6 +1443,11 @@ function applySSEUpdate(msg) {
         renderForecastChart(msg.forecast);
         updateForecastMeta(msg.forecast);
         updateHaWarnings(msg.forecast.ha_warnings || []);
+    }
+
+    // v8: Dynamic buffer section update via SSE
+    if (msg.buffer) {
+        updateBufferSection(msg.buffer);
     }
 }
 
