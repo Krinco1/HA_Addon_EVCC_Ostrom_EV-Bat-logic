@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 8 (Residual RL and Learning) — Plan 02 complete
+**Current focus:** Phase 8 (Residual RL and Learning) — Plans 01 and 02 complete
 
 ## Current Position
 
 Phase: 8 of 8 (Residual RL and Learning)
-Plan: 2 of 4 in current phase — 08-02 complete (SeasonalLearner + ForecastReliabilityTracker)
-Status: 48-cell seasonal error accumulator and rolling MAE tracker created; both modules persist to JSON and survive container restarts; data accumulation begins on deployment
-Last activity: 2026-02-23 — Phase 8 Plan 02 executed (808ab3d)
+Plan: 2 of 4 in current phase — 08-01 complete (ResidualRLAgent + Comparator Extension)
+Status: ResidualRLAgent (49-action delta space, stratified seasonal replay, shadow/advisory mode) + Comparator slot-0 cost accounting; model_version=2 migration guard resets old DQNAgent Q-tables cleanly
+Last activity: 2026-02-23 — Phase 8 Plan 01 executed (2444010)
 
 Progress: [██████████] 99%
 
@@ -43,6 +43,7 @@ Progress: [██████████] 99%
 | Phase 07 P02 | 1 | 4 min | 4 min |
 | Phase 07 P03 | 1 | 3 min | 3 min |
 
+| Phase 08 P01 | 1 | 5 min | 5 min |
 | Phase 08 P02 | 1 | 2 min | 2 min |
 
 **Recent Trend:**
@@ -85,6 +86,10 @@ Recent decisions affecting current work:
 - [Phase 07-03]: Past departure times treated as 12h default window (no urgency inflation for expired entries)
 - [Phase 07-03]: Connected vehicle tie-break +5.0; quiet hours absolute priority +1000.0 preserved
 - [Phase 07-03]: urgency color thresholds: red >= 10, amber >= 3, blue < 3
+- [Phase 08-01]: ResidualRLAgent outputs signed ct/kWh delta corrections on LP thresholds (never full actions) — agent cannot conflict with LP safety guarantees
+- [Phase 08-01]: model_version=2 field is primary migration guard; old DQNAgent Q-tables (version 1 or missing) reset cleanly
+- [Phase 08-01]: compare_residual() uses slot-0 energy cost only — NOT plan.solver_fun (which is full 24h LP objective); docstring warning added
+- [Phase 08-01]: Comparator persistence version=2; old v1 format loads with graceful fallback (residual entries reset, legacy compare() data preserved)
 - [Phase 08-02]: MONTH_TO_SEASON explicit dict avoids naive (month-1)//3 bug that maps December to season 3 (autumn)
 - [Phase 08-02]: ForecastReliabilityTracker PV reference scale is 5.0 kW; callers must convert state.pv_power (W) to kW
 - [Phase 08-02]: SeasonalLearner: no decay (simple running average) — decay deferred to Phase 9 per research recommendation
@@ -101,6 +106,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 08-02-PLAN.md — SeasonalLearner and ForecastReliabilityTracker created
-Resume file: .planning/phases/08-residual-rl-and-learning/08-02-SUMMARY.md
-Next: Execute Phase 8 Plan 03 (RL agent wiring / integration)
+Stopped at: Completed 08-01-PLAN.md — ResidualRLAgent + Comparator Extension implemented
+Resume file: .planning/phases/08-residual-rl-and-learning/08-01-SUMMARY.md
+Next: Execute Phase 8 Plan 03 (RL agent wiring into main.py)

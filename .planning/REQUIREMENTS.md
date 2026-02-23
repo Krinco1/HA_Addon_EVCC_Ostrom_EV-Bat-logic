@@ -38,7 +38,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 
 ### Lernendes System
 
-- [ ] **LERN-01**: RL-Agent lernt Korrekturen zum Planer (Residual Learning) statt eigenständige Entscheidungen
+- [x] **LERN-01**: RL-Agent lernt Korrekturen zum Planer (Residual Learning) statt eigenständige Entscheidungen
 - [x] **LERN-02**: System erkennt und adaptiert saisonale Muster (Verbrauch, PV-Ertrag, Preisverhalten über Jahreszeiten)
 - [ ] **LERN-03**: System lernt angemessene Reaktionszeiten (wann Plan sofort anpassen vs Abweichung abwarten)
 - [x] **LERN-04**: System lernt die Zuverlässigkeit aller Prognosen (PV, Preis, Verbrauch) und korrigiert künftige Planungen mit Konfidenz-Faktoren
@@ -92,7 +92,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRIV-01 | Phase 7 | Complete |
 | DRIV-02 | Phase 7 | Complete |
 | DRIV-03 | Phase 7 | Complete |
-| LERN-01 | Phase 8 | Pending |
+| LERN-01 | Phase 8 | Complete |
 | LERN-02 | Phase 8 | Complete |
 | LERN-03 | Phase 8 | Pending |
 | LERN-04 | Phase 8 | Complete |
