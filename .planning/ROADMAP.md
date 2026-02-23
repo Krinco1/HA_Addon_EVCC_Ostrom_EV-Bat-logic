@@ -186,14 +186,13 @@ Plans:
   3. The system tracks forecast reliability (PV, consumption, price) over time and applies learned confidence factors when these forecasts feed into the planner — a forecast source that is consistently 30% off gets a lower confidence weight than one that is consistently accurate
   4. The dashboard shows a live RL vs planner comparison widget: rolling win-rate (percentage of cycles where RL corrections reduced cost vs plan-only), average cost delta per day, and cumulative savings estimate
   5. The RL agent runs in shadow mode (logging corrections but not applying them) for the first 30 days, and transitions to advisory mode only after a structured constraint audit confirms no shadow corrections would have violated safety constraints
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 08-01: Refactor ResidualRLAgent: change from full action selection to delta corrections (+/-20 ct clip); implement stratified replay buffer (retain samples from all four seasons); reward = plan_cost - actual_cost
-- [ ] 08-02: Implement SeasonalLearner: 48-cell lookup table with decay, sample counts, and plan-error accumulation; deploy immediately at Phase 8 start for data accumulation
-- [ ] 08-03: Implement forecast reliability tracker: per-source (PV, consumption, price) rolling accuracy measurement; apply confidence factors in HorizonPlanner and DynamicBufferCalc
-- [ ] 08-04: Implement adaptive reaction timing: track which deviations from plan self-corrected vs required intervention; learn threshold for "wait" vs "re-plan now"
-- [ ] 08-05: Implement RL dashboard widget: win-rate, cost delta, cumulative savings; 30-day shadow mode gate; structured constraint audit checklist before advisory promotion
+- [ ] 08-01-PLAN.md — ResidualRLAgent with delta corrections (+/-20ct clip), stratified replay buffer, extended Comparator with slot-0 cost accounting
+- [ ] 08-02-PLAN.md — SeasonalLearner (48-cell lookup table) and ForecastReliabilityTracker (per-source rolling MAE with confidence factors)
+- [ ] 08-03-PLAN.md — ReactionTimingTracker, main loop wiring for all learners, shadow mode branching, confidence factors into planner and buffer
+- [ ] 08-04-PLAN.md — Dashboard "Lernen" tab with German labels, GET /rl-learning and /rl-audit endpoints, constraint audit display
 
 ## Progress
 
@@ -214,4 +213,4 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 5. Dynamic Buffer | 2/2 | Complete   | 2026-02-23 |
 | 6. Decision Transparency | 2/3 | Complete    | 2026-02-23 |
 | 7. Driver Interaction | 3/3 | Complete    | 2026-02-23 |
-| 8. Residual RL and Learning | 0/5 | Not started | - |
+| 8. Residual RL and Learning | 0/4 | Planned | - |
