@@ -2329,24 +2329,23 @@ function _renderLernenWidget(data) {
         'Korrekturbereich eingehalten',
         'Positive Gewinnrate'
     ];
-    var auditKeys = ['min_soc', 'departure_target', 'delta_clip', 'win_rate'];
-
     if (data.audit !== null && data.audit !== undefined) {
         html += '<h4 style="margin-bottom:8px;color:#e2e8f0;">Sicherheitspr\u00FCfung</h4>';
-        var checks = data.audit.checks || {};
-        var allPassed = true;
-        for (var ci = 0; ci < auditKeys.length; ci++) {
-            var passed = checks[auditKeys[ci]];
-            if (!passed) allPassed = false;
-            html += '<div class="lernen-audit-check">';
+        var checks = data.audit.checks || [];
+        for (var ci = 0; ci < checks.length; ci++) {
+            var check = checks[ci];
+            var passed = check.passed;
+            var label = check.name || auditLabels[ci] || 'Unbekannt';
+            var detail = check.detail || '';
+            html += '<div class="lernen-audit-check" title="' + detail + '">';
             if (passed) {
-                html += '<span class="lernen-audit-pass">&#10003;</span> ' + auditLabels[ci];
+                html += '<span class="lernen-audit-pass">&#10003;</span> ' + label;
             } else {
-                html += '<span class="lernen-audit-fail">&#10007;</span> ' + auditLabels[ci];
+                html += '<span class="lernen-audit-fail">&#10007;</span> ' + label;
             }
             html += '</div>';
         }
-        if (allPassed) {
+        if (data.audit.all_passed) {
             html += '<div style="margin-top:10px;color:#68d391;"><strong>Automatische Bef\u00F6rderung verf\u00FCgbar</strong></div>';
         } else {
             html += '<div style="margin-top:10px;color:#ffaa00;"><strong>Weitere Beobachtung erforderlich</strong></div>';
