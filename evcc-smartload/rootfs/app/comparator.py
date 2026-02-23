@@ -1,16 +1,19 @@
 """
-LP vs RL comparator, reward calculator, and per-device RL controller — v5.0
+LP vs RL comparator, reward calculator, and per-device RL controller — v6.0 (Phase 8)
 
-Changes:
-  - Reward function understands v5 battery actions 0-6 and EV actions 0-4
-  - Cost evaluation uses percentile-aware logic
-  - Per-device comparison updated for new discharge action (6)
+Changes from v5:
+  - compare_residual(): slot-0 cost comparison for ResidualRLAgent delta corrections
+  - get_recent_comparisons(): rolling 7-day window for residual comparison entries
+  - cumulative_savings_eur(): sum of (plan_cost - actual_cost) over all residual entries
+  - avg_daily_savings(): average daily savings over last 7 days
+  - Persistence version bumped to 2; graceful fallback for old v1 format
+  - Backward-compatible: existing compare(), get_status(), /comparisons endpoint unchanged
 """
 
 import json
 import sqlite3
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from config import Config, COMPARISON_LOG_PATH, DEVICE_CONTROL_DB_PATH
@@ -37,6 +40,9 @@ class Comparator:
         self.device_wins: Dict[str, int] = defaultdict(int)
         self.device_costs_lp: Dict[str, float] = defaultdict(float)
         self.device_costs_rl: Dict[str, float] = defaultdict(float)
+
+        # Phase 8: residual comparison entries (slot-0 cost accounting)
+        self._residual_comparisons: List[Dict] = []
 
         self._load()
 
@@ -263,6 +269,116 @@ class Comparator:
                 return 0.1
             return 0.0
 
+    # ------------------------------------------------------------------
+    # ResidualRLAgent slot-0 cost comparisons (Phase 8)
+    # ------------------------------------------------------------------
+
+    def compare_residual(
+        self,
+        plan_slot0_cost_eur: float,
+        actual_slot0_cost_eur: float,
+        delta_bat_ct: float,
+        delta_ev_ct: float,
+    ):
+        """Record a residual RL comparison using slot-0 energy cost accounting.
+
+        CRITICAL (Pitfall 2 from research):
+        plan_slot0_cost_eur MUST be the slot-0 grid energy cost:
+            slot0.price_eur_kwh * (slot0.bat_charge_kw + slot0.ev_charge_kw) * 0.25
+        Do NOT use plan.solver_fun — that is the full 24h horizon LP objective.
+        Comparing a 24h cost against a 15-min actual cost produces nonsense rewards.
+
+        Args:
+            plan_slot0_cost_eur:   Slot-0 grid energy cost from LP plan (15-min, EUR).
+            actual_slot0_cost_eur: Actual slot-0 grid energy cost incurred (15-min, EUR).
+            delta_bat_ct:          Battery delta correction applied (ct/kWh).
+            delta_ev_ct:           EV delta correction applied (ct/kWh).
+        """
+        rl_better = actual_slot0_cost_eur < plan_slot0_cost_eur
+        entry: Dict = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "plan_cost_eur": plan_slot0_cost_eur,
+            "actual_cost_eur": actual_slot0_cost_eur,
+            "rl_better": rl_better,
+            "delta_bat_ct": delta_bat_ct,
+            "delta_ev_ct": delta_ev_ct,
+        }
+        self._residual_comparisons.append(entry)
+        self.save()
+
+    def get_recent_comparisons(self, days: int = 7) -> List[Dict]:
+        """Return residual comparison entries from the last `days` days.
+
+        Each entry: {timestamp, plan_cost_eur, actual_cost_eur, rl_better,
+                     delta_bat_ct, delta_ev_ct}
+
+        Args:
+            days: Rolling window in days (default 7).
+
+        Returns:
+            List of comparison dicts within the window.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        result = []
+        for entry in self._residual_comparisons:
+            try:
+                ts_str = entry.get("timestamp", "")
+                if ts_str.endswith("Z"):
+                    ts_str = ts_str.replace("Z", "+00:00")
+                ts = datetime.fromisoformat(ts_str)
+                if ts >= cutoff:
+                    result.append(entry)
+            except Exception:
+                continue
+        return result
+
+    def cumulative_savings_eur(self) -> float:
+        """Return cumulative savings over all recorded residual comparisons.
+
+        savings = sum(plan_cost - actual_cost) for all entries.
+        Positive means RL corrections collectively saved money vs the unmodified LP plan.
+        Prefix with 'ca.' in dashboard (per Phase 06-01 convention) to signal it's
+        a simulated estimate, not a directly metered value.
+        """
+        return sum(
+            e.get("plan_cost_eur", 0.0) - e.get("actual_cost_eur", 0.0)
+            for e in self._residual_comparisons
+        )
+
+    def avg_daily_savings(self, days: int = 7) -> Optional[float]:
+        """Return average daily savings over the last `days` days.
+
+        Returns None if fewer than 1 day of data exists (avoids misleading averages
+        from sparse early data — Pitfall 7 from research).
+
+        Args:
+            days: Rolling window in days (default 7).
+        """
+        recent = self.get_recent_comparisons(days=days)
+        if not recent:
+            return None
+
+        # Determine actual span in days
+        try:
+            timestamps = []
+            for e in recent:
+                ts_str = e.get("timestamp", "")
+                if ts_str.endswith("Z"):
+                    ts_str = ts_str.replace("Z", "+00:00")
+                timestamps.append(datetime.fromisoformat(ts_str))
+            if not timestamps:
+                return None
+            span_days = max(1.0, (max(timestamps) - min(timestamps)).total_seconds() / 86400)
+            if span_days < 1.0:
+                return None  # less than 1 day of data
+            total_savings = sum(
+                e.get("plan_cost_eur", 0.0) - e.get("actual_cost_eur", 0.0)
+                for e in recent
+            )
+            return total_savings / span_days
+        except Exception:
+            return None
+
     def get_status(self) -> Dict:
         n = len(self.comparisons)
         return {
@@ -281,6 +397,7 @@ class Comparator:
             with open(COMPARISON_LOG_PATH, "w") as f:
                 json.dump(
                     {
+                        "version": 2,
                         "comparisons": self.comparisons[-1000:],
                         "lp_total_cost": self.lp_total_cost,
                         "rl_total_cost": self.rl_total_cost,
@@ -290,6 +407,7 @@ class Comparator:
                         "device_wins": dict(self.device_wins),
                         "device_costs_lp": dict(self.device_costs_lp),
                         "device_costs_rl": dict(self.device_costs_rl),
+                        "residual_comparisons": self._residual_comparisons[-2000:],
                     },
                     f,
                 )
@@ -323,6 +441,16 @@ class Comparator:
                 self.device_costs_lp[k] = v
             for k, v in data.get("device_costs_rl", {}).items():
                 self.device_costs_rl[k] = v
+
+            # Phase 8: residual comparisons — graceful fallback for v1 format
+            saved_version = data.get("version", 1)
+            if saved_version >= 2:
+                self._residual_comparisons = data.get("residual_comparisons", [])
+            else:
+                # Old format (v1): no residual data — start fresh, keep legacy data
+                self._residual_comparisons = []
+                log("info", "Comparator: v1 format detected, residual entries reset (legacy data kept)")
+
             n = len(self.comparisons)
             if n:
                 log("info", f"Comparator loaded: {n} comparisons, win rate {self.rl_wins / n * 100:.1f}%")
