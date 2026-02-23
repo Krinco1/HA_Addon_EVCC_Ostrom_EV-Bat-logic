@@ -33,7 +33,10 @@ from forecaster.ha_energy import run_entity_discovery
 from decision_log import DecisionLog, log_main_cycle
 from optimizer import HolisticOptimizer, EventDetector
 from optimizer.planner import HorizonPlanner
-from rl_agent import DQNAgent
+from rl_agent import ResidualRLAgent
+from seasonal_learner import SeasonalLearner
+from forecast_reliability import ForecastReliabilityTracker
+from reaction_timing import ReactionTimingTracker
 from comparator import Comparator, RLDeviceController
 from controller import Controller
 from vehicle_monitor import DataCollector, VehicleMonitor
@@ -140,11 +143,40 @@ def main():
     except Exception as e:
         log("warning", f"DynamicBufferCalc: init failed ({e}), buffer management disabled")
 
-    rl_agent = DQNAgent(cfg)
+    # --- Phase 8: ResidualRLAgent (replaces DQNAgent) ---
+    rl_agent = None
+    try:
+        rl_agent = ResidualRLAgent(cfg)
+        log("info", f"ResidualRLAgent: initialized (mode={rl_agent.mode})")
+    except Exception as e:
+        log("warning", f"ResidualRLAgent: init failed ({e}), RL corrections disabled")
+
     event_detector = EventDetector()
     comparator = Comparator(cfg)
     controller = Controller(evcc, cfg)
     rl_devices = RLDeviceController(cfg)
+
+    # --- Phase 8: Learning subsystems ---
+    seasonal_learner = None
+    try:
+        seasonal_learner = SeasonalLearner()
+        log("info", f"SeasonalLearner: {seasonal_learner.populated_cell_count()} cells populated")
+    except Exception as e:
+        log("warning", f"SeasonalLearner init failed: {e}")
+
+    forecast_reliability = None
+    try:
+        forecast_reliability = ForecastReliabilityTracker()
+        log("info", "ForecastReliabilityTracker initialized")
+    except Exception as e:
+        log("warning", f"ForecastReliabilityTracker init failed: {e}")
+
+    reaction_timing = None
+    try:
+        reaction_timing = ReactionTimingTracker()
+        log("info", "ReactionTimingTracker initialized")
+    except Exception as e:
+        log("warning", f"ReactionTimingTracker init failed: {e}")
 
     # --- v5: EV charge sequencer ---
     sequencer = ChargeSequencer(cfg, evcc) if cfg.sequencer_enabled else None
@@ -198,14 +230,6 @@ def main():
     if sequencer is not None and departure_store is not None:
         sequencer.departure_store = departure_store
 
-    # --- RL bootstrap ---
-    if not rl_agent.load():
-        max_rec = getattr(cfg, "rl_bootstrap_max_records", 1000)
-        bootstrapped = rl_agent.bootstrap_from_influxdb(influx, hours=168, max_records=max_rec)
-        if bootstrapped:
-            rl_agent.save()
-            comparator.seed_from_bootstrap(bootstrapped)
-
     # --- Register all known devices for RL tracking ---
     rl_devices.get_device_mode("battery")
     for vp in cfg.vehicle_providers:
@@ -238,10 +262,13 @@ def main():
     web.buffer_calc = buffer_calc
     web.plan_snapshotter = plan_snapshotter
     web.override_manager = override_manager
+    # Phase 8: Learning subsystems (late attribute assignment, consistent with other components)
+    web.seasonal_learner = seasonal_learner
+    web.forecast_reliability = forecast_reliability
+    web.reaction_timing = reaction_timing
 
     # --- Main decision loop ---
     last_state: Optional[SystemState] = None
-    last_rl_action: Optional[Action] = None
     learning_steps = 0
     # Phase 7 Plan 02: plug-in detection state
     last_ev_connected = False
@@ -330,6 +357,50 @@ def main():
 
             events = event_detector.detect(state)
 
+            # --- Phase 8: Forecast reliability updates ---
+            # Update per-source rolling MAE before planner so confidence factors
+            # are fresh for this cycle's LP call.
+            if forecast_reliability is not None:
+                current_slot_idx = _current_slot_index()
+
+                # PV reliability: convert W -> kW (Pitfall 4 from research)
+                if pv_96 is not None and state.pv_power is not None:
+                    actual_pv_kw = state.pv_power / 1000.0
+                    if 0 <= current_slot_idx < len(pv_96):
+                        try:
+                            forecast_reliability.update("pv", actual=actual_pv_kw, forecast=pv_96[current_slot_idx])
+                        except Exception as e:
+                            log("debug", f"ForecastReliabilityTracker.update(pv) error: {e}")
+
+                # Consumption reliability
+                if consumption_96 is not None and state.home_power is not None:
+                    if 0 <= current_slot_idx < len(consumption_96):
+                        try:
+                            forecast_reliability.update("consumption", actual=state.home_power, forecast=consumption_96[current_slot_idx])
+                        except Exception as e:
+                            log("debug", f"ForecastReliabilityTracker.update(consumption) error: {e}")
+
+                # Price reliability
+                if tariffs and state.current_price is not None:
+                    try:
+                        forecast_reliability.update("price", actual=state.current_price, forecast=float(tariffs[0].get("value", state.current_price)))
+                    except Exception as e:
+                        log("debug", f"ForecastReliabilityTracker.update(price) error: {e}")
+
+            # Build confidence factors for planner (None if tracker unavailable)
+            confidence_factors = None
+            if forecast_reliability is not None:
+                confidence_factors = {
+                    "pv": forecast_reliability.get_confidence("pv"),
+                    "consumption": forecast_reliability.get_confidence("consumption"),
+                    "price": forecast_reliability.get_confidence("price"),
+                }
+
+            # PV reliability factor for buffer calc
+            pv_reliability = 1.0
+            if forecast_reliability is not None:
+                pv_reliability = forecast_reliability.get_confidence("pv")
+
             # --- Phase 4: Predictive Planner (LP-based) ---
             plan = None
             if horizon_planner is not None and consumption_96 is not None and pv_96 is not None:
@@ -339,6 +410,7 @@ def main():
                     consumption_96=consumption_96,
                     pv_96=pv_96,
                     ev_departure_times=_get_departure_times(departure_store, cfg, state),
+                    confidence_factors=confidence_factors,
                 )
 
             # --- Phase 7: Check Boost Charge override ---
@@ -366,34 +438,91 @@ def main():
                 lp_action = optimizer.optimize(state, tariffs)
                 log("info", "Decision: HolisticOptimizer fallback")
 
-            # --- RL decision (shadow) ---
-            rl_action = rl_agent.select_action(state, explore=True)
+            # --- Phase 8: ResidualRLAgent shadow/advisory mode branching ---
+            # Skip RL entirely if agent not available or boost override is active.
+            # (Pitfall 5 from research: override state pollutes shadow audit log.)
+            override_active = _override_active  # alias for clarity
 
-            # --- Per-device mode selection ---
-            bat_mode = rl_devices.get_device_mode("battery")
-            ev_mode = (
-                rl_devices.get_device_mode(state.ev_name)
-                if state.ev_connected and state.ev_name
-                else "lp"
-            )
+            # Track action index for RL learning step later
+            _rl_bat_delta_ct: float = 0.0
+            _rl_ev_delta_ct: float = 0.0
+            _rl_action_idx: int = 0
 
-            # When Boost override is active: keep evcc in 'now' mode by not touching EV action.
-            # The EV action is set to 1 (charge) without a price limit so controller passes it
-            # through unchanged. The override_manager.activate() already set evcc to 'now'.
-            if _override_active:
-                final = Action(
-                    battery_action=rl_action.battery_action if bat_mode == "rl" else lp_action.battery_action,
-                    battery_limit_eur=rl_action.battery_limit_eur if bat_mode == "rl" else lp_action.battery_limit_eur,
-                    ev_action=1,        # keep charging; evcc already in 'now' mode
-                    ev_limit_eur=None,  # no price limit — driver wants it charged NOW
-                )
+            if rl_agent is not None and not override_active:
+                _rl_bat_delta_ct, _rl_ev_delta_ct = rl_agent.select_delta(state, explore=True)
+                # Derive action index from deltas for learning step
+                from rl_agent import DELTA_OPTIONS_CT, N_EV_DELTAS
+                try:
+                    bat_idx = DELTA_OPTIONS_CT.index(_rl_bat_delta_ct)
+                    ev_idx = DELTA_OPTIONS_CT.index(_rl_ev_delta_ct)
+                    _rl_action_idx = bat_idx * N_EV_DELTAS + ev_idx
+                except (ValueError, IndexError):
+                    _rl_action_idx = 0
+
+                if rl_agent.mode == "shadow":
+                    # Log correction but do NOT apply (shadow mode)
+                    rl_agent.log_shadow_correction(
+                        _rl_bat_delta_ct, _rl_ev_delta_ct,
+                        plan_bat_price_ct=(lp_action.battery_limit_eur or 0) * 100,
+                        plan_ev_price_ct=(lp_action.ev_limit_eur or 0) * 100,
+                        state=state,
+                        is_override_active=override_active,
+                    )
+                    if _override_active:
+                        final = Action(
+                            battery_action=lp_action.battery_action,
+                            battery_limit_eur=lp_action.battery_limit_eur,
+                            ev_action=1,        # keep charging; override already set evcc to 'now'
+                            ev_limit_eur=None,
+                        )
+                    else:
+                        final = lp_action  # unmodified LP plan in shadow mode
+
+                elif rl_agent.mode == "advisory":
+                    adj_bat_ct, adj_ev_ct = rl_agent.apply_correction(
+                        plan_bat_price_ct=(lp_action.battery_limit_eur or 0) * 100,
+                        plan_ev_price_ct=(lp_action.ev_limit_eur or 0) * 100,
+                        delta_bat_ct=_rl_bat_delta_ct,
+                        delta_ev_ct=_rl_ev_delta_ct,
+                        state=state,
+                    )
+                    if _override_active:
+                        final = Action(
+                            battery_action=lp_action.battery_action,
+                            battery_limit_eur=adj_bat_ct / 100,
+                            ev_action=1,        # keep charging; override already set evcc to 'now'
+                            ev_limit_eur=None,
+                        )
+                    else:
+                        final = Action(
+                            battery_action=lp_action.battery_action,
+                            battery_limit_eur=adj_bat_ct / 100,
+                            ev_action=lp_action.ev_action,
+                            ev_limit_eur=adj_ev_ct / 100,
+                        )
+                else:
+                    # Unknown mode — fall through to LP plan
+                    if _override_active:
+                        final = Action(
+                            battery_action=lp_action.battery_action,
+                            battery_limit_eur=lp_action.battery_limit_eur,
+                            ev_action=1,
+                            ev_limit_eur=None,
+                        )
+                    else:
+                        final = lp_action
+
             else:
-                final = Action(
-                    battery_action=rl_action.battery_action if bat_mode == "rl" else lp_action.battery_action,
-                    battery_limit_eur=rl_action.battery_limit_eur if bat_mode == "rl" else lp_action.battery_limit_eur,
-                    ev_action=rl_action.ev_action if ev_mode == "rl" else lp_action.ev_action,
-                    ev_limit_eur=rl_action.ev_limit_eur if ev_mode == "rl" else lp_action.ev_limit_eur,
-                )
+                # RL agent unavailable or override active: use LP plan as-is
+                if _override_active:
+                    final = Action(
+                        battery_action=lp_action.battery_action,
+                        battery_limit_eur=lp_action.battery_limit_eur,
+                        ev_action=1,        # keep charging; evcc already in 'now' mode
+                        ev_limit_eur=None,
+                    )
+                else:
+                    final = lp_action
 
             actual_cost = controller.apply(final)
 
@@ -411,6 +540,7 @@ def main():
                         price_spread=state.price_spread,
                         pv_96=pv_96 or [],
                         now=datetime.now(timezone.utc),
+                        pv_reliability_factor=pv_reliability,  # Phase 8: LERN-04
                     )
                 except Exception as e:
                     log("warning", f"DynamicBufferCalc: step failed ({e})")
@@ -448,7 +578,7 @@ def main():
             store.update(
                 state=state,
                 lp_action=lp_action,
-                rl_action=rl_action,
+                rl_action=final,  # Phase 8: final action (rl-adjusted or lp fallback)
                 solar_forecast=solar_forecast,
                 consumption_forecast=consumption_96,
                 pv_forecast=pv_96,
@@ -461,41 +591,107 @@ def main():
                 buffer_result=buffer_result,
             )
 
-            # --- RL learning ---
-            rl_agent.imitation_learn(state, lp_action)
-            if last_state is not None and last_rl_action is not None:
-                reward = comparator.calculate_reward(last_state, last_rl_action, state, events)
-                priority = 2.0 if events else 1.0
-                rl_agent.learn(last_state, last_rl_action, reward, state, False, priority)
-                learning_steps += 1
-                if learning_steps % 50 == 0:
-                    log("info", f"RL: {learning_steps} steps, ε={rl_agent.epsilon:.3f}")
+            # --- Phase 8: Shared slot-0 cost computation ---
+            # Computed once and used by SeasonalLearner, Comparator, and RL learning.
+            # This prevents NameError when one learner is None but another needs the values.
+            plan_slot0_cost = None
+            actual_slot0_cost = None
+            if plan is not None:
+                plan_slot0_cost = _compute_slot0_cost(plan, state)
+                actual_slot0_cost = _compute_actual_slot0_cost(state)
 
-            comparator.compare(state, lp_action, rl_action, actual_cost)
-            comparator.compare_per_device(state, lp_action, rl_action, actual_cost,
-                                          rl_devices, all_vehicles=all_vehicles)
+            # --- Phase 8: SeasonalLearner update (LERN-02) ---
+            if seasonal_learner is not None:
+                if plan_slot0_cost is not None and actual_slot0_cost is not None:
+                    plan_error = actual_slot0_cost - plan_slot0_cost  # positive = plan was optimistic
+                    try:
+                        seasonal_learner.update(datetime.now(timezone.utc), plan_error)
+                    except Exception as e:
+                        log("debug", f"SeasonalLearner.update error: {e}")
+
+            # --- Phase 8: ReactionTimingTracker update + re-plan trigger (LERN-03) ---
+            if reaction_timing is not None and plan is not None:
+                plan_action_str = _action_to_str(lp_action)
+                actual_action_str = _action_to_str(final)
+                try:
+                    reaction_timing.update(plan_action_str, actual_action_str)
+                    # LERN-03: trigger immediate re-plan when deviation won't self-correct
+                    if plan_action_str != actual_action_str and reaction_timing.should_replan_immediately():
+                        log("info", "ReactionTimingTracker: deviation unlikely to self-correct, triggering re-plan")
+                        try:
+                            plan = horizon_planner.plan(
+                                state=state,
+                                tariffs=tariffs,
+                                consumption_96=consumption_96,
+                                pv_96=pv_96,
+                                ev_departure_times=_get_departure_times(departure_store, cfg, state),
+                                confidence_factors=confidence_factors,
+                            )
+                            if plan and plan.slots:
+                                lp_action = _action_from_plan(plan, state)
+                        except Exception as e:
+                            log("warning", f"Immediate re-plan failed: {e}")
+                except Exception as e:
+                    log("debug", f"ReactionTimingTracker.update error: {e}")
+
+            # --- Phase 8: Comparator residual update (uses shared slot-0 costs) ---
+            if comparator is not None and rl_agent is not None and not override_active:
+                if plan_slot0_cost is not None and actual_slot0_cost is not None:
+                    try:
+                        comparator.compare_residual(plan_slot0_cost, actual_slot0_cost, _rl_bat_delta_ct, _rl_ev_delta_ct)
+                    except Exception as e:
+                        log("debug", f"Comparator.compare_residual error: {e}")
+
+            # --- Phase 8: RL learning step (uses shared slot-0 costs) ---
+            if rl_agent is not None and not override_active:
+                if plan_slot0_cost is not None and actual_slot0_cost is not None and last_state is not None:
+                    try:
+                        reward = rl_agent.calculate_reward(plan_slot0_cost, actual_slot0_cost)
+                        rl_agent.learn_from_correction(state, _rl_action_idx, reward, state)
+                        learning_steps += 1
+                        if learning_steps % 50 == 0:
+                            log("info", f"RL: {learning_steps} correction steps, ε={rl_agent.epsilon:.3f}")
+                    except Exception as e:
+                        log("debug", f"RL learn_from_correction error: {e}")
+
+            # Legacy comparator metrics (backward-compat with /comparisons dashboard endpoint)
+            try:
+                comparator.compare(state, lp_action, final, actual_cost)
+                comparator.compare_per_device(state, lp_action, final, actual_cost,
+                                              rl_devices, all_vehicles=all_vehicles)
+            except Exception as e:
+                log("debug", f"Comparator.compare error: {e}")
+
+            # --- Phase 8: Auto-promotion check (once per cycle when shadow elapsed) ---
+            if rl_agent is not None and rl_agent.mode == "shadow":
+                if rl_agent.shadow_elapsed_days() >= 30:
+                    try:
+                        audit_result = rl_agent.run_constraint_audit()
+                        rl_agent.maybe_promote(audit_result)
+                    except Exception as e:
+                        log("debug", f"RL auto-promotion check error: {e}")
 
             last_state = state
-            last_rl_action = rl_action
 
             # --- Logging ---
             p20 = state.price_percentiles.get(20, 0) * 100
             bat_names = {0: "hold", 1: "P20", 2: "P40", 3: "P60", 4: "max", 5: "PV", 6: "dis"}
-            bi = "🟢" if bat_mode == "rl" else "🔵"
+            rl_mode_label = f"[{rl_agent.mode}]" if rl_agent is not None else "[no-rl]"
+            epsilon_label = f"ε={rl_agent.epsilon:.3f}" if rl_agent is not None else "ε=n/a"
             log("info",
-                f"{bi}Bat={bat_names.get(lp_action.battery_action, '?')} "
+                f"{rl_mode_label} Bat={bat_names.get(lp_action.battery_action, '?')} "
                 f"EV={lp_action.ev_action} "
                 f"price={state.current_price * 100:.1f}ct P20={p20:.1f}ct "
-                f"spread={state.price_spread * 100:.1f}ct ε={rl_agent.epsilon:.3f}")
+                f"spread={state.price_spread * 100:.1f}ct {epsilon_label}")
 
             try:
                 log_main_cycle(decision_log, state, cfg, all_vehicles,
-                               lp_action, rl_action, comparator, tariffs,
+                               lp_action, final, comparator, tariffs,
                                solar_forecast, sequencer=sequencer)
             except Exception as e:
                 log("debug", f"Decision log error: {e}")
 
-            if rl_agent.total_steps % 50 == 0 and rl_agent.total_steps > 0:
+            if rl_agent is not None and rl_agent.total_steps % 50 == 0 and rl_agent.total_steps > 0:
                 rl_agent.save()
                 comparator.save()
 
@@ -674,6 +870,91 @@ def _check_notification_triggers(notifier, driver_mgr, sequencer, all_vehicles,
             f"Bedarf: {need_kwh:.0f} kWh bis {cfg.ev_target_soc}%"
         )
         notifier.send_charge_inquiry(name, soc, reason)
+
+
+def _current_slot_index() -> int:
+    """Return the current 15-min slot index (0..95) for the current UTC time.
+
+    Phase 8: used by ForecastReliabilityTracker to look up the forecast value
+    corresponding to the current cycle's actual measurement.
+
+    Returns:
+        int in [0, 95]: hour*4 + minute//15
+    """
+    now = datetime.now(timezone.utc)
+    return now.hour * 4 + now.minute // 15
+
+
+def _compute_slot0_cost(plan, state) -> Optional[float]:
+    """Compute planned grid energy cost for slot 0 (15-min window, EUR).
+
+    CRITICAL (Pitfall 2 from research): Do NOT use plan.solver_fun (full 24h LP
+    objective). Use slot-0 only for per-cycle RL reward computation.
+
+    Formula: slot0.price_eur_kwh * (bat_charge_kw + ev_charge_kw) * 0.25
+
+    Args:
+        plan: PlanHorizon with at least one slot.
+        state: Current SystemState (unused but included for future extension).
+
+    Returns:
+        Float cost in EUR, or None if plan has no slots.
+    """
+    if plan is None or not plan.slots:
+        return None
+    slot0 = plan.slots[0]
+    total_charge_kw = slot0.bat_charge_kw + slot0.ev_charge_kw
+    return slot0.price_eur_kwh * total_charge_kw * 0.25
+
+
+def _compute_actual_slot0_cost(state) -> Optional[float]:
+    """Compute actual grid energy cost for the current 15-min window (EUR).
+
+    Formula: current_price * actual_grid_power_kw * 0.25
+    Grid power: state.grid_power (positive = importing from grid).
+
+    Args:
+        state: Current SystemState.
+
+    Returns:
+        Float cost in EUR, or None if current_price not available.
+    """
+    if state is None or state.current_price is None:
+        return None
+    grid_kw = max(0.0, getattr(state, "grid_power", 0) / 1000.0)
+    return state.current_price * grid_kw * 0.25
+
+
+def _action_to_str(action) -> str:
+    """Convert an Action object to a ReactionTimingTracker action string.
+
+    Maps Action battery/ev fields to canonical strings:
+        bat_charge   — battery charging (action 1-4)
+        bat_discharge — battery discharging (action 6)
+        bat_hold     — battery holding (action 0)
+        ev_charge    — EV charging (action 1+)
+        ev_idle      — EV not charging (action 0)
+
+    Returns compound string "bat_X/ev_Y" for combined identification.
+    The tracker stores the first segment only for battery comparison;
+    for simplicity we return the combined form and let tracker use it as-is.
+    """
+    if action is None:
+        return "bat_hold/ev_idle"
+
+    bat_act = getattr(action, "battery_action", 0)
+    ev_act = getattr(action, "ev_action", 0)
+
+    if bat_act in (1, 2, 3, 4):
+        bat_str = "bat_charge"
+    elif bat_act == 6:
+        bat_str = "bat_discharge"
+    else:
+        bat_str = "bat_hold"
+
+    ev_str = "ev_charge" if ev_act and ev_act > 0 else "ev_idle"
+
+    return f"{bat_str}/{ev_str}"
 
 
 if __name__ == "__main__":
