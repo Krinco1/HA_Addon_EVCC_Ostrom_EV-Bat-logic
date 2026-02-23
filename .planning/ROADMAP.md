@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Predictive Planner** - Rolling-horizon 24-48h LP optimizer replaces static euro price limits with joint battery and EV dispatch planning (completed 2026-02-22)
 - [x] **Phase 4.1: Deploy Configuration** - Version bump to 6.0.0, config.yaml schema completion, repository.yaml channel field (INSERTED — gap closure) (completed 2026-02-22)
 - [x] **Phase 4.2: CI/CD Pipeline** - GitHub Actions multi-arch container build and push to GHCR (INSERTED — gap closure) (completed 2026-02-22)
-- [ ] **Phase 4.3: Release Documentation** - CHANGELOG.md and README.md updated for Phases 1-4 features (INSERTED — gap closure)
+- [x] **Phase 4.3: Release Documentation** - CHANGELOG.md and README.md updated for Phases 1-4 features (INSERTED — gap closure) (completed 2026-02-23)
 - [ ] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day
 - [ ] **Phase 6: Decision Transparency** - Dashboard shows 24-48h plan timeline, per-slot decision explanations, and planned-vs-actual historical comparison
 - [ ] **Phase 7: Driver Interaction** - Manual override from dashboard and Telegram, proactive departure-time queries, and driver-context-aware multi-EV prioritization
@@ -127,7 +127,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04.3-01-PLAN.md — CHANGELOG.md v5.1-v6.0 entries, README.md architecture and API updates (2 tasks: changelog entries + readme updates)
+- [x] 04.3-01-PLAN.md — CHANGELOG.md v5.1-v6.0 entries, README.md architecture and API updates (completed 2026-02-23)
 
 ### Phase 5: Dynamic Buffer
 **Goal**: The battery minimum SoC adapts situationally — higher when PV forecast confidence is low or prices are flat, lower when cheap solar is reliably incoming
@@ -209,7 +209,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 4. Predictive Planner | 3/3 | Complete    | 2026-02-22 |
 | 4.1 Deploy Configuration | 1/1 | Complete    | 2026-02-22 |
 | 4.2 CI/CD Pipeline | 1/1 | Complete (CI test-only, GHCR abandoned) | 2026-02-23 |
-| 4.3 Release Documentation | 0/1 | Not started | - |
+| 4.3 Release Documentation | 1/1 | Complete | 2026-02-23 |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
 | 7. Driver Interaction | 0/3 | Not started | - |
