@@ -57,6 +57,9 @@ class StateStore:
         # --- Phase 4: LP plan storage (guarded by _lock) ---
         self._plan: Optional[PlanHorizon] = None
 
+        # --- Phase 5: Dynamic buffer result (guarded by _lock) ---
+        self._buffer_result: Optional[dict] = None
+
         # --- SSE client queues (guarded by _sse_lock, separate from _lock) ---
         self._sse_clients: List[queue.Queue] = []
         self._sse_lock = threading.Lock()
@@ -79,6 +82,7 @@ class StateStore:
         forecaster_ready: bool = False,
         forecaster_data_days: int = 0,
         ha_warnings: Optional[List[str]] = None,
+        buffer_result: Optional[dict] = None,
     ) -> None:
         """Update all state fields atomically under RLock.
 
@@ -100,6 +104,8 @@ class StateStore:
             self._forecaster_ready = forecaster_ready
             self._forecaster_data_days = forecaster_data_days
             self._ha_warnings = list(ha_warnings) if ha_warnings else []
+            # Phase 5: dynamic buffer result
+            self._buffer_result = buffer_result
             # Take snapshot while still holding lock
             snap = self._snapshot_unlocked()
 
@@ -155,6 +161,8 @@ class StateStore:
             "forecaster_ready": self._forecaster_ready,
             "forecaster_data_days": self._forecaster_data_days,
             "ha_warnings": list(self._ha_warnings) if self._ha_warnings else [],
+            # Phase 5: dynamic buffer result
+            "buffer_result": copy.copy(self._buffer_result),
         }
         # Phase 4: plan summary fields (lightweight — full slot timeline in Phase 6)
         if self._plan is not None:
@@ -286,4 +294,6 @@ def _snapshot_to_json_dict(snap: Dict) -> Dict:
         },
         # Phase 4: plan_summary — lightweight LP plan status for dashboard
         "plan_summary": plan_summary,
+        # Phase 5: dynamic buffer — mode, current_buffer_pct, days_remaining, log_recent
+        "buffer": snap.get("buffer_result"),
     }

@@ -127,6 +127,15 @@ def main():
     except Exception as e:
         log("warning", f"HorizonPlanner: init failed ({e}), using HolisticOptimizer only")
 
+    # --- Phase 5: DynamicBufferCalc (situational battery min SoC) ---
+    buffer_calc = None
+    try:
+        from dynamic_buffer import DynamicBufferCalc
+        buffer_calc = DynamicBufferCalc(cfg, evcc)
+        log("info", "DynamicBufferCalc: initialized")
+    except Exception as e:
+        log("warning", f"DynamicBufferCalc: init failed ({e}), buffer management disabled")
+
     rl_agent = DQNAgent(cfg)
     event_detector = EventDetector()
     comparator = Comparator(cfg)
@@ -317,6 +326,19 @@ def main():
             any_ev_connected = any(v.connected_to_wallbox for v in all_vehicles.values())
             _run_bat_to_ev(cfg, state, controller, all_vehicles, tariffs, solar_forecast, any_ev_connected)
 
+            # --- Phase 5: Dynamic Buffer ---
+            buffer_result = None
+            if buffer_calc is not None and not controller._bat_to_ev_active:
+                try:
+                    buffer_result = buffer_calc.step(
+                        pv_confidence=pv_forecaster.confidence,
+                        price_spread=state.price_spread,
+                        pv_96=pv_96 or [],
+                        now=datetime.now(timezone.utc),
+                    )
+                except Exception as e:
+                    log("warning", f"DynamicBufferCalc: step failed ({e})")
+
             # --- v5: Charge Sequencer ---
             now = datetime.now(timezone.utc)
             if sequencer is not None:
@@ -360,6 +382,7 @@ def main():
                 forecaster_ready=consumption_forecaster.is_ready,
                 forecaster_data_days=consumption_forecaster.data_days,
                 ha_warnings=ha_discovery_result.get("warnings", []),
+                buffer_result=buffer_result,
             )
 
             # --- RL learning ---
