@@ -1504,6 +1504,59 @@ function startSSE() {
 }
 
 // =============================================================================
+// Phase 6: Tab navigation and Plan Gantt chart
+// =============================================================================
+
+/**
+ * Switch between tabs: main (Status), plan (Plan-Gantt), history (Historie).
+ * Overrides the inline fallback in dashboard.html with full implementation
+ * that triggers data fetching on tab activation.
+ */
+function switchTab(name) {
+    var tabs = ['main', 'plan', 'history'];
+    for (var t = 0; t < tabs.length; t++) {
+        var el = document.getElementById('tab-' + tabs[t]);
+        if (el) el.style.display = (tabs[t] === name ? '' : 'none');
+    }
+    document.querySelectorAll('.tab-btn').forEach(function(btn, idx) {
+        btn.classList.toggle('active', tabs[idx] === name);
+    });
+    if (name === 'plan') {
+        fetchAndRenderPlan();
+    }
+    if (name === 'history') {
+        fetchAndRenderHistory();
+    }
+}
+
+/**
+ * Stub for Plan 03 — Historie tab data loading.
+ */
+function fetchAndRenderHistory() { /* Plan 03 */ }
+
+/**
+ * Fetch /plan and render the SVG Gantt chart if data is available.
+ * Shows planNoData element if plan is not available.
+ */
+function fetchAndRenderPlan() {
+    fetchJSON('/plan').then(function(data) {
+        if (!data || !data.available || !data.slots || !data.slots.length) {
+            var noData = $('planNoData');
+            var chartWrap = $('planChartWrap');
+            if (noData) noData.style.display = '';
+            if (chartWrap) chartWrap.style.display = 'none';
+            return;
+        }
+        var noData = $('planNoData');
+        var chartWrap = $('planChartWrap');
+        if (noData) noData.style.display = 'none';
+        if (chartWrap) chartWrap.style.display = '';
+        window._planSlots = data.slots;
+        renderPlanGantt(data.slots, data.computed_at);
+    });
+}
+
+// =============================================================================
 // Kick off
 // =============================================================================
 
