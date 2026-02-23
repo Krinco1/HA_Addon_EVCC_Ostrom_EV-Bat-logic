@@ -384,10 +384,26 @@
         <div id="planNoData" style="display:none;" class="chart-card"><p>Kein Plan verfügbar &mdash; LP läuft noch oder ist nicht aktiv.</p></div>
     </div>
 
-    <!-- Tab: Historie (Phase 6 — Plan vs. Actual comparison, rendered by Plan 03) -->
+    <!-- Tab: Historie (Phase 6 Plan 03 — Plan vs. Actual comparison) -->
     <div id="tab-history" class="tab-panel" style="display:none;">
-        <div id="historyContent"></div>
-        <div id="historyNoData" style="display:none;" class="chart-card"><p>Keine historischen Daten verfügbar.</p></div>
+        <div class="chart-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h2 style="margin:0;">Plan vs. Realit&auml;t</h2>
+                <div>
+                    <button class="btn-sm history-range active" data-hours="24" onclick="toggleHistoryRange(24)">24h</button>
+                    <button class="btn-sm history-range" data-hours="168" onclick="toggleHistoryRange(168)">7 Tage</button>
+                </div>
+            </div>
+            <div id="historyChartWrap"></div>
+        </div>
+        <div class="chart-card" id="historyContent">
+            <h2 style="margin-bottom:10px;">Detailvergleich</h2>
+            <div id="historyTableWrap"></div>
+            <div id="historySummary" style="margin-top:8px;font-weight:bold;"></div>
+        </div>
+        <div id="historyNoData" style="display:none;" class="chart-card">
+            <p>Keine historischen Daten verf&uuml;gbar &mdash; InfluxDB nicht konfiguriert oder noch keine Plan-Zyklen aufgezeichnet.</p>
+        </div>
     </div>
 
 </div>

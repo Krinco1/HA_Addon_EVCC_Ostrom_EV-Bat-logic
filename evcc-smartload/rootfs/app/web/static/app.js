@@ -1529,10 +1529,262 @@ function switchTab(name) {
     }
 }
 
+// =============================================================================
+// Phase 6 Plan 03: Historie tab — Plan vs. Actual comparison
+// =============================================================================
+
+/** Current look-back window selected by the user (24 or 168 hours). */
+var _historyHours = 24;
+
 /**
- * Stub for Plan 03 — Historie tab data loading.
+ * Fetch /history and render the overlay chart + cost-deviation table.
+ * Called by switchTab('history') and toggleHistoryRange().
  */
-function fetchAndRenderHistory() { /* Plan 03 */ }
+function fetchAndRenderHistory() {
+    fetch('/history?hours=' + _historyHours)
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+            if (!data || !data.available || !data.rows || !data.rows.length) {
+                var noData = $('historyNoData');
+                var content = $('historyContent');
+                var chartWrap = $('historyChartWrap');
+                var tableWrap = $('historyTableWrap');
+                var summary  = $('historySummary');
+                if (noData)   noData.style.display = '';
+                if (chartWrap) chartWrap.innerHTML = '';
+                if (tableWrap) tableWrap.innerHTML = '';
+                if (summary)   summary.innerHTML = '';
+                if (content)  content.style.display = 'none';
+                return;
+            }
+            var noData = $('historyNoData');
+            var content = $('historyContent');
+            if (noData)  noData.style.display = 'none';
+            if (content) content.style.display = '';
+            renderHistoryChart(data.rows);
+            renderHistoryTable(data.rows);
+        })
+        .catch(function(e) {
+            console.error('fetchAndRenderHistory error:', e);
+        });
+}
+
+/**
+ * Re-fetch history data for a different time window and re-render.
+ * @param {number} hours 24 (default) or 168 (7 days)
+ */
+function toggleHistoryRange(hours) {
+    _historyHours = hours;
+    // Update toggle button active state
+    var btns = document.querySelectorAll('.history-range');
+    for (var b = 0; b < btns.length; b++) {
+        btns[b].classList.toggle('active', parseInt(btns[b].getAttribute('data-hours')) === hours);
+    }
+    fetchAndRenderHistory();
+}
+
+/**
+ * Render an SVG overlay chart comparing planned battery power (dashed green)
+ * vs actual battery power (solid blue), with fill areas showing cost deviation.
+ * @param {Array} rows History rows from /history endpoint
+ */
+function renderHistoryChart(rows) {
+    var wrap = $('historyChartWrap');
+    if (!wrap || !rows || !rows.length) return;
+
+    var W = 960, H = 200;
+    var marginL = 50, marginR = 50, marginT = 20, marginB = 35;
+    var plotW = W - marginL - marginR;
+    var plotH = H - marginT - marginB;
+    var n = rows.length;
+
+    // --- Determine max power for Y scale (use kW for both series) ---
+    var maxKw = 0.5;
+    for (var i = 0; i < n; i++) {
+        var planKw = rows[i].planned_bat_charge_kw || 0;
+        var actKw  = Math.abs(rows[i].actual_bat_power_kw || 0);
+        if (planKw > maxKw) maxKw = planKw;
+        if (actKw  > maxKw) maxKw = actKw;
+    }
+    maxKw = Math.ceil(maxKw * 1.1 * 2) / 2;  // round up to nearest 0.5 kW, with 10% headroom
+
+    function xPos(idx) { return marginL + (idx / (n - 1 || 1)) * plotW; }
+    function yPos(kw)  { return marginT + plotH - (kw / maxKw) * plotH; }
+
+    var s = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+
+    // --- Grid lines (Y) ---
+    var yStep = maxKw <= 2 ? 0.5 : (maxKw <= 5 ? 1 : 2);
+    for (var yv = 0; yv <= maxKw; yv += yStep) {
+        var yy = yPos(yv);
+        s += '<line x1="' + marginL + '" y1="' + yy.toFixed(1) + '" x2="' + (W - marginR) + '" y2="' + yy.toFixed(1) + '" stroke="#333" stroke-width="0.5"/>';
+        s += '<text x="' + (marginL - 4) + '" y="' + (yy + 3).toFixed(1) + '" fill="#666" font-size="9" text-anchor="end" font-family="sans-serif">' + yv.toFixed(1) + '</text>';
+    }
+    s += '<text x="8" y="' + (marginT + plotH / 2).toFixed(1) + '" fill="#888" font-size="8" text-anchor="middle" font-family="sans-serif" transform="rotate(-90,8,' + (marginT + plotH / 2).toFixed(1) + ')">kW</text>';
+
+    // --- Fill areas between planned and actual ---
+    // Red fill where actual > planned (costlier), green fill where actual < planned (cheaper)
+    if (n >= 2) {
+        var redPts = '';
+        var greenPts = '';
+        for (var fi = 0; fi < n; fi++) {
+            var px = xPos(fi).toFixed(1);
+            var planY = yPos(rows[fi].planned_bat_charge_kw || 0).toFixed(1);
+            var actY  = yPos(Math.max(0, rows[fi].actual_bat_power_kw || 0)).toFixed(1);
+            redPts   += (fi === 0 ? 'M' : 'L') + px + ',' + planY + ' ';
+            greenPts += (fi === 0 ? 'M' : 'L') + px + ',' + actY + ' ';
+        }
+        // Build closed fill path for each region: traverse forward (planned) then backward (actual)
+        var fwdPlan = '', fwdAct = '';
+        for (var fj = 0; fj < n; fj++) {
+            var fpx = xPos(fj).toFixed(1);
+            var fpY = yPos(rows[fj].planned_bat_charge_kw || 0).toFixed(1);
+            var faY = yPos(Math.max(0, rows[fj].actual_bat_power_kw || 0)).toFixed(1);
+            fwdPlan += (fj === 0 ? 'M' : 'L') + fpx + ',' + fpY + ' ';
+            fwdAct  += 'L' + fpx + ',' + faY + ' ';
+        }
+        // Reverse the actual path to close the fill polygon
+        var revAct = '';
+        for (var fk = n - 1; fk >= 0; fk--) {
+            var rk = xPos(fk).toFixed(1);
+            var rkY = yPos(Math.max(0, rows[fk].actual_bat_power_kw || 0)).toFixed(1);
+            revAct += 'L' + rk + ',' + rkY + ' ';
+        }
+        s += '<path d="' + fwdPlan + revAct + 'Z" fill="#ff4444" opacity="0.12"/>';
+        s += '<path d="';
+        for (var fl = 0; fl < n; fl++) {
+            var flx = xPos(fl).toFixed(1);
+            var flActY = yPos(Math.max(0, rows[fl].actual_bat_power_kw || 0)).toFixed(1);
+            var flPlanY = yPos(rows[fl].planned_bat_charge_kw || 0).toFixed(1);
+            if (fl === 0) s += 'M' + flx + ',' + flActY + ' ';
+            else s += 'L' + flx + ',' + flActY + ' ';
+        }
+        var revPlan = '';
+        for (var fm = n - 1; fm >= 0; fm--) {
+            var rx2 = xPos(fm).toFixed(1);
+            var ry2 = yPos(rows[fm].planned_bat_charge_kw || 0).toFixed(1);
+            revPlan += 'L' + rx2 + ',' + ry2 + ' ';
+        }
+        s += revPlan + 'Z" fill="#00ff88" opacity="0.12"/>';
+    }
+
+    // --- Planned line (dashed green) ---
+    var planPts = '';
+    for (var pi2 = 0; pi2 < n; pi2++) {
+        var ppx = xPos(pi2).toFixed(1);
+        var ppy = yPos(rows[pi2].planned_bat_charge_kw || 0).toFixed(1);
+        planPts += (pi2 === 0 ? 'M' : 'L') + ppx + ',' + ppy + ' ';
+    }
+    s += '<path d="' + planPts + '" fill="none" stroke="#00ff88" stroke-width="1.8" stroke-dasharray="5,3"/>';
+
+    // --- Actual line (solid blue) ---
+    var actPts = '';
+    for (var ai = 0; ai < n; ai++) {
+        var apx = xPos(ai).toFixed(1);
+        var apy = yPos(Math.max(0, rows[ai].actual_bat_power_kw || 0)).toFixed(1);
+        actPts += (ai === 0 ? 'M' : 'L') + apx + ',' + apy + ' ';
+    }
+    s += '<path d="' + actPts + '" fill="none" stroke="#00d4ff" stroke-width="1.8"/>';
+
+    // --- X-axis time labels (every 2–3 hours for 24h, every 24h for 7d) ---
+    var labelStep = n <= 96 ? Math.ceil(n / 12) : Math.ceil(n / 7);
+    for (var li = 0; li < n; li += labelStep) {
+        var lx = xPos(li).toFixed(1);
+        var lt = rows[li].time || '';
+        var label = '';
+        try {
+            var d = new Date(lt);
+            if (_historyHours > 24) {
+                label = (d.getDate()) + '.' + (d.getMonth() + 1) + ' ' + _pad2(d.getHours()) + ':' + _pad2(d.getMinutes());
+            } else {
+                label = _pad2(d.getHours()) + ':' + _pad2(d.getMinutes());
+            }
+        } catch(e) { label = ''; }
+        s += '<text x="' + lx + '" y="' + (marginT + plotH + 14) + '" fill="#888" font-size="8" text-anchor="middle" font-family="sans-serif">' + label + '</text>';
+    }
+    s += '<text x="' + (W - marginR + 5) + '" y="' + (marginT + plotH + 14) + '" fill="#888" font-size="8" font-family="sans-serif">' + (_historyHours > 24 ? '7T' : '24h') + '</text>';
+
+    // --- Legend ---
+    s += '<line x1="' + (marginL + 10) + '" y1="' + (H - 8) + '" x2="' + (marginL + 30) + '" y2="' + (H - 8) + '" stroke="#00ff88" stroke-width="2" stroke-dasharray="5,3"/>';
+    s += '<text x="' + (marginL + 33) + '" y="' + (H - 5) + '" fill="#00ff88" font-size="8" font-family="sans-serif">Geplant</text>';
+    s += '<line x1="' + (marginL + 90) + '" y1="' + (H - 8) + '" x2="' + (marginL + 110) + '" y2="' + (H - 8) + '" stroke="#00d4ff" stroke-width="2"/>';
+    s += '<text x="' + (marginL + 113) + '" y="' + (H - 5) + '" fill="#00d4ff" font-size="8" font-family="sans-serif">Tats\u00e4chlich</text>';
+
+    s += '</svg>';
+    wrap.innerHTML = s;
+}
+
+/**
+ * Render the cost-deviation detail table into #historyTableWrap.
+ * Columns: Zeit | Geplant (kW) | Tatsächlich (kW) | Preis (ct) | Abweichung (EUR)
+ * @param {Array} rows History rows from /history endpoint
+ */
+function renderHistoryTable(rows) {
+    var wrap = $('historyTableWrap');
+    if (!wrap || !rows || !rows.length) return;
+
+    var MAX_ROWS = 96;
+    var displayRows = rows.length > MAX_ROWS ? rows.slice(rows.length - MAX_ROWS) : rows;
+    var totalDelta = 0;
+    for (var ti = 0; ti < rows.length; ti++) {
+        totalDelta += rows[ti].cost_delta_eur || 0;
+    }
+
+    var h = '<table class="buffer-log-table">';
+    h += '<thead><tr>';
+    h += '<th>Zeit</th>';
+    h += '<th>Geplant (kW)</th>';
+    h += '<th>Tats&#228;chlich (kW)</th>';
+    h += '<th>Preis (ct)</th>';
+    h += '<th>Abweichung (EUR)</th>';
+    h += '</tr></thead><tbody>';
+
+    for (var ri = 0; ri < displayRows.length; ri++) {
+        var row = displayRows[ri];
+        var timeLabel = '';
+        try {
+            var d = new Date(row.time);
+            if (_historyHours > 24) {
+                timeLabel = (d.getDate()) + '.' + (d.getMonth() + 1) + '. ' + _pad2(d.getHours()) + ':' + _pad2(d.getMinutes());
+            } else {
+                timeLabel = _pad2(d.getHours()) + ':' + _pad2(d.getMinutes());
+            }
+        } catch(e) { timeLabel = row.time || ''; }
+
+        var planKw   = (row.planned_bat_charge_kw || 0) - (row.planned_bat_discharge_kw || 0);
+        var actKw    = row.actual_bat_power_kw || 0;
+        var priceCt  = (row.actual_price_ct || 0).toFixed(1);
+        var delta    = row.cost_delta_eur || 0;
+        var deltaColor = delta <= 0 ? '#00ff88' : '#ff4444';
+        var deltaSign  = delta <= 0 ? '' : '+';
+
+        h += '<tr>';
+        h += '<td>' + timeLabel + '</td>';
+        h += '<td>' + planKw.toFixed(2) + '</td>';
+        h += '<td>' + actKw.toFixed(2) + '</td>';
+        h += '<td>' + priceCt + '</td>';
+        h += '<td style="color:' + deltaColor + ';font-weight:bold;">' + deltaSign + delta.toFixed(4) + '</td>';
+        h += '</tr>';
+    }
+    h += '</tbody></table>';
+
+    if (rows.length > MAX_ROWS) {
+        h += '<div style="margin-top:6px;font-size:0.82em;color:#888;">Zeige letzte ' + MAX_ROWS + ' von ' + rows.length + ' Eintr&#228;gen</div>';
+    }
+    wrap.innerHTML = h;
+
+    // Cost summary
+    var summary = $('historySummary');
+    if (summary) {
+        var sumColor  = totalDelta <= 0 ? '#00ff88' : '#ff4444';
+        var sumSign   = totalDelta <= 0 ? '' : '+';
+        var sumLabel  = totalDelta <= 0 ? 'gespart' : 'teurer als geplant';
+        summary.innerHTML = 'Gesamtabweichung: <span style="color:' + sumColor + ';font-weight:bold;">' + sumSign + totalDelta.toFixed(4) + ' EUR</span> <span style="color:#888;font-size:0.9em;">(' + sumLabel + ')</span>';
+    }
+}
+
+/** Zero-pad a number to 2 digits. */
+function _pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
 /**
  * Render an SVG Gantt chart of 96 dispatch slots into #planChartWrap.
