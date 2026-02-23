@@ -41,6 +41,7 @@ from charge_sequencer import ChargeSequencer
 from driver_manager import DriverManager
 from web import WebServer
 from plan_snapshotter import PlanSnapshotter
+from override_manager import OverrideManager
 
 
 def main():
@@ -168,6 +169,18 @@ def main():
             log("error", f"Telegram setup failed: {e}")
             notifier = None
 
+    # --- Phase 7: Override Manager (Boost Charge) ---
+    override_manager = None
+    try:
+        override_manager = OverrideManager(cfg, evcc, notifier)
+        log("info", "OverrideManager: initialized")
+    except Exception as e:
+        log("warning", f"OverrideManager: init failed ({e}), boost-charge disabled")
+
+    # Inject override_manager into notifier for Telegram command handling
+    if notifier is not None and override_manager is not None:
+        notifier.override_manager = override_manager
+
     # --- RL bootstrap ---
     if not rl_agent.load():
         max_rec = getattr(cfg, "rl_bootstrap_max_records", 1000)
@@ -207,6 +220,7 @@ def main():
     web.notifier = notifier
     web.buffer_calc = buffer_calc
     web.plan_snapshotter = plan_snapshotter
+    web.override_manager = override_manager
 
     # --- Main decision loop ---
     last_state: Optional[SystemState] = None
@@ -294,6 +308,11 @@ def main():
                     ev_departure_times=_get_departure_times(cfg),
                 )
 
+            # --- Phase 7: Check Boost Charge override ---
+            # If a driver override is active, skip LP-based EV action; evcc stays in 'now' mode.
+            _override_status = override_manager.get_status() if override_manager else {"active": False}
+            _override_active = _override_status.get("active", False)
+
             if plan is not None:
                 lp_action = _action_from_plan(plan, state)
                 store.update_plan(plan)
@@ -325,12 +344,23 @@ def main():
                 else "lp"
             )
 
-            final = Action(
-                battery_action=rl_action.battery_action if bat_mode == "rl" else lp_action.battery_action,
-                battery_limit_eur=rl_action.battery_limit_eur if bat_mode == "rl" else lp_action.battery_limit_eur,
-                ev_action=rl_action.ev_action if ev_mode == "rl" else lp_action.ev_action,
-                ev_limit_eur=rl_action.ev_limit_eur if ev_mode == "rl" else lp_action.ev_limit_eur,
-            )
+            # When Boost override is active: keep evcc in 'now' mode by not touching EV action.
+            # The EV action is set to 1 (charge) without a price limit so controller passes it
+            # through unchanged. The override_manager.activate() already set evcc to 'now'.
+            if _override_active:
+                final = Action(
+                    battery_action=rl_action.battery_action if bat_mode == "rl" else lp_action.battery_action,
+                    battery_limit_eur=rl_action.battery_limit_eur if bat_mode == "rl" else lp_action.battery_limit_eur,
+                    ev_action=1,        # keep charging; evcc already in 'now' mode
+                    ev_limit_eur=None,  # no price limit — driver wants it charged NOW
+                )
+            else:
+                final = Action(
+                    battery_action=rl_action.battery_action if bat_mode == "rl" else lp_action.battery_action,
+                    battery_limit_eur=rl_action.battery_limit_eur if bat_mode == "rl" else lp_action.battery_limit_eur,
+                    ev_action=rl_action.ev_action if ev_mode == "rl" else lp_action.ev_action,
+                    ev_limit_eur=rl_action.ev_limit_eur if ev_mode == "rl" else lp_action.ev_limit_eur,
+                )
 
             actual_cost = controller.apply(final)
 

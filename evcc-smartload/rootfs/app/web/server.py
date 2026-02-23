@@ -87,6 +87,8 @@ class WebServer:
         self.explanation_gen = ExplanationGenerator()
         # Phase 6: plan snapshotter for /history endpoint (wired late by main.py)
         self.plan_snapshotter = None
+        # Phase 7: override manager for Boost Charge (wired late by main.py)
+        self.override_manager = None
 
     # ------------------------------------------------------------------
     # Start
@@ -251,6 +253,9 @@ class WebServer:
                     else:
                         rows = srv.plan_snapshotter.query_comparison(hours)
                         self._json({"available": bool(rows), "hours": hours, "rows": rows})
+                # Phase 7: override status
+                elif path == "/override/status":
+                    self._json(srv._api_override_status())
                 elif path == "/docs":
                     self._html(srv._docs_index())
                 elif path.startswith("/docs/"):
@@ -385,6 +390,13 @@ class WebServer:
                         return
                     srv.buffer_calc.extend_observation(extra_days=days)
                     self._json({"ok": True, "mode": "observation", "extended_days": days})
+
+                # Phase 7: Boost Charge override endpoints
+                elif path == "/override/boost":
+                    self._json(srv._api_override_boost(body))
+
+                elif path == "/override/cancel":
+                    self._json(srv._api_override_cancel())
 
                 else:
                     self._json({"error": "not found"}, 404)
@@ -744,6 +756,27 @@ class WebServer:
             "total_cost_eur": round(plan.solver_fun, 3),
             "slots": slots,
         }
+
+    def _api_override_boost(self, body: dict) -> dict:
+        """Phase 7: POST /override/boost — activate Boost Charge override."""
+        if self.override_manager is None:
+            return {"error": "Override nicht verfügbar", "status": 503}
+        vehicle = body.get("vehicle", "")
+        if not vehicle:
+            return {"error": "vehicle required", "status": 400}
+        return self.override_manager.activate(vehicle, "dashboard")
+
+    def _api_override_cancel(self) -> dict:
+        """Phase 7: POST /override/cancel — cancel active override."""
+        if self.override_manager is None:
+            return {"error": "Override nicht verfügbar", "status": 503}
+        return self.override_manager.cancel()
+
+    def _api_override_status(self) -> dict:
+        """Phase 7: GET /override/status — return current override state."""
+        if self.override_manager is None:
+            return {"error": "Override nicht verfügbar", "status": 503}
+        return self.override_manager.get_status()
 
     def _api_chart_data(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
         snap = self._store.snapshot()
