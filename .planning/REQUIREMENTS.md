@@ -85,8 +85,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PLAN-03 | Phase 5 | Complete |
 | PLAN-04 | Phase 3 | Complete |
 | PLAN-05 | Phase 3 | Complete |
-| TRAN-01 | Phase 6 | Pending |
-| TRAN-02 | Phase 6 | Pending |
+| TRAN-01 | Phase 6 | Complete |
+| TRAN-02 | Phase 6 | Complete |
 | TRAN-03 | Phase 8 | Pending |
 | TRAN-04 | Phase 6 | Pending |
 | DRIV-01 | Phase 7 | Pending |
