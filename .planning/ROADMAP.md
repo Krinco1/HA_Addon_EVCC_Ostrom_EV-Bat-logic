@@ -138,10 +138,11 @@ Plans:
   2. Every buffer adjustment is logged to the dashboard with the specific inputs that drove it (confidence level, price spread, time of day, expected PV), so the user can audit and understand every change
   3. The buffer never drops below a hard 10% floor regardless of forecast or price signals
   4. During the first 2 weeks after deployment, the DynamicBufferCalc runs in observation mode (logging what it would do) rather than actively changing the buffer, allowing calibration before live use
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: Implement DynamicBufferCalc: formula with spread_bonus, pv_reduction, confidence gate, hard 10% floor; observation mode for first 2 weeks; log every event with full inputs
+- [ ] 05-01-PLAN.md — DynamicBufferCalc engine with formula, observation mode, persistence; main loop integration; StateStore SSE extension
+- [ ] 05-02-PLAN.md — Dashboard UI: confidence widget, observation banner, buffer history chart, event log table, POST API endpoints for mode control
 
 ### Phase 6: Decision Transparency
 **Goal**: Users can see the full 24-48h plan in the dashboard, understand why each slot was chosen, and compare what was planned against what actually happened
@@ -210,7 +211,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 4.1 Deploy Configuration | 1/1 | Complete    | 2026-02-22 |
 | 4.2 CI/CD Pipeline | 1/1 | Complete (CI test-only, GHCR abandoned) | 2026-02-23 |
 | 4.3 Release Documentation | 1/1 | Complete | 2026-02-23 |
-| 5. Dynamic Buffer | 0/1 | Not started | - |
+| 5. Dynamic Buffer | 0/2 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
 | 7. Driver Interaction | 0/3 | Not started | - |
 | 8. Residual RL and Learning | 0/5 | Not started | - |
