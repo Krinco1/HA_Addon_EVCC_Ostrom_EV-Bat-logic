@@ -122,16 +122,28 @@ class DynamicBufferCalc:
 
     def step(
         self,
-        pv_confidence: float,    # 0.0–1.0 from PVForecaster.confidence
-        price_spread: float,     # EUR/kWh from SystemState.price_spread
-        pv_96: list,             # 96-slot kW forecast from PVForecaster
+        pv_confidence: float,           # 0.0–1.0 from PVForecaster.confidence
+        price_spread: float,            # EUR/kWh from SystemState.price_spread
+        pv_96: list,                    # 96-slot kW forecast from PVForecaster
         now: Optional[datetime] = None,
+        pv_reliability_factor: float = 1.0,  # Phase 8: multiplier from ForecastReliabilityTracker
     ) -> dict:
         """
         Run one calculation cycle. Called every 15 minutes from main loop.
 
         In observation mode: logs what would happen, does NOT call evcc.
         In live mode: calls evcc.set_buffer_soc() only when target changes.
+
+        Args:
+            pv_confidence:       PV forecast confidence 0.0–1.0 from PVForecaster.
+            price_spread:        EUR/kWh from SystemState.price_spread.
+            pv_96:               96-slot kW forecast from PVForecaster.
+            now:                 Current UTC datetime (defaults to datetime.now(utc)).
+            pv_reliability_factor: Phase 8 confidence multiplier from ForecastReliabilityTracker.
+                Applied as: effective_confidence = pv_confidence * pv_reliability_factor.
+                If PV forecasts are only 70% reliable (tracker returns 0.7), the buffer
+                calc receives reduced confidence, keeping the buffer higher (more conservative).
+                Defaults to 1.0 (no reduction — backward compatible).
 
         Returns:
             {
@@ -145,8 +157,12 @@ class DynamicBufferCalc:
         if now is None:
             now = datetime.now(timezone.utc)
 
+        # Phase 8: apply reliability factor to PV confidence before formula
+        pv_reliability_factor = max(0.0, min(1.0, float(pv_reliability_factor)))
+        effective_pv_confidence = pv_confidence * pv_reliability_factor
+
         mode = self._determine_mode(now)
-        target_buffer = self._compute_target(pv_confidence, price_spread, pv_96, now)
+        target_buffer = self._compute_target(effective_pv_confidence, price_spread, pv_96, now)
         old_buffer = self._current_buffer_pct
 
         applied = (mode == "live")
@@ -157,11 +173,11 @@ class DynamicBufferCalc:
             with self._lock:
                 self._current_buffer_pct = target_buffer
 
-        reason = self._build_reason(pv_confidence, price_spread, target_buffer, mode)
+        reason = self._build_reason(effective_pv_confidence, price_spread, target_buffer, mode)
 
         # Always log every cycle for chart continuity (observation entries: applied=False)
         event = BufferEvent(
-            pv_confidence=pv_confidence,
+            pv_confidence=effective_pv_confidence,
             price_spread_ct=price_spread,
             hour_of_day=now.hour,
             expected_pv_kw=self._sum_next_4h_pv(pv_96),

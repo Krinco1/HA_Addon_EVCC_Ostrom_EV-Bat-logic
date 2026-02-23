@@ -96,6 +96,7 @@ class HorizonPlanner:
         consumption_96: List[float],
         pv_96: List[float],
         ev_departure_times: Dict[str, datetime],
+        confidence_factors: Optional[Dict] = None,
     ) -> Optional[PlanHorizon]:
         """Solve LP for the next 24h horizon.
 
@@ -105,12 +106,27 @@ class HorizonPlanner:
             consumption_96: 96-element list of Watt values (house consumption forecast)
             pv_96: 96-element list of kW values (PV generation forecast)
             ev_departure_times: Dict mapping EV name (or '_default') to departure UTC datetime
+            confidence_factors: Optional dict with per-source confidence values (0.0–1.0).
+                Keys: "pv", "consumption", "price". Missing keys default to 1.0.
+                Applied as a multiplier on the PV surplus reduction in the LP objective.
+                Lower PV confidence means the planner trusts PV forecasts less and acts
+                more conservatively with battery discharge timing.
+                NOTE (Phase 8 research): Price confidence affects planning conservatism
+                via DynamicBufferCalc (not LP coefficients directly). Only "pv" is applied
+                to the LP objective. See Phase 8 RESEARCH.md Open Question 1.
 
         Returns:
             PlanHorizon with 96 DispatchSlots on success, None on any failure.
         """
         try:
             now = state.timestamp or datetime.now(timezone.utc)
+
+            # Resolve confidence factors (default to 1.0 for backward compatibility)
+            if confidence_factors is None:
+                confidence_factors = {}
+            pv_confidence_factor = float(confidence_factors.get("pv", 1.0))
+            # Clamp to [0, 1] for safety
+            pv_confidence_factor = max(0.0, min(1.0, pv_confidence_factor))
 
             # Step 1: Convert tariffs to 96-slot price array
             price_96 = self._tariffs_to_96slots(tariffs, now)
@@ -122,8 +138,11 @@ class HorizonPlanner:
             if state.ev_connected:
                 self._check_ev_feasibility(state, price_96, ev_departure_times, now)
 
-            # Step 3: Solve LP
-            result = self._solve_lp(state, price_96, consumption_96, pv_96, ev_departure_times, now)
+            # Step 3: Solve LP (pass pv_confidence_factor for objective scaling)
+            result = self._solve_lp(
+                state, price_96, consumption_96, pv_96, ev_departure_times, now,
+                pv_confidence_factor=pv_confidence_factor,
+            )
             if result is None:
                 return None
 
@@ -208,8 +227,15 @@ class HorizonPlanner:
         pv_96: List[float],
         ev_departure_times: Dict[str, datetime],
         now: datetime,
+        pv_confidence_factor: float = 1.0,
     ):
         """Build and solve the LP for joint battery + EV dispatch.
+
+        Args:
+            pv_confidence_factor: Confidence multiplier (0.0–1.0) from ForecastReliabilityTracker.
+                Applied to the PV surplus reduction in the objective: a lower factor means
+                the planner trusts PV forecasts less, reducing PV coverage benefit and
+                acting more conservatively with PV-driven free charging.
 
         Variable layout (T=96, N_vars = 5*T+2 = 482):
             bat_charge[t]    [i_bat_chg, i_bat_chg+T)   kW battery charge
@@ -260,12 +286,15 @@ class HorizonPlanner:
             # Effective grid price for charging: reduce when PV can cover it
             # We model this by reducing cost proportionally to PV surplus coverage
             # (Pitfall 3 mitigation: don't over-count PV as grid-priced)
+            # Phase 8: pv_confidence_factor scales PV surplus — lower confidence means
+            # less PV benefit in the objective (more conservative PV-driven decisions).
             effective_price = price_96[t]
             if pv_surplus_kw > 0.05:
                 # PV surplus: reduce charge cost proportionally
                 # When PV fully covers bat_p_max, charge is effectively free
+                # Apply confidence factor: reduces PV coverage benefit when forecast is unreliable
                 pv_coverage = min(1.0, pv_surplus_kw / max(self._bat_p_max, 0.1))
-                effective_price = price_96[t] * (1.0 - pv_coverage)
+                effective_price = price_96[t] * (1.0 - pv_coverage * pv_confidence_factor)
 
             # Apply config max-price bounds: charging above threshold is penalized
             # (LP upper-bound enforcement via objective — acts as soft price gate)
