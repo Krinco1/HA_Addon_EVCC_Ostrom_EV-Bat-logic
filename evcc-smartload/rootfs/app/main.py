@@ -42,6 +42,7 @@ from driver_manager import DriverManager
 from web import WebServer
 from plan_snapshotter import PlanSnapshotter
 from override_manager import OverrideManager
+from departure_store import DepartureTimeStore
 
 
 def main():
@@ -181,6 +182,19 @@ def main():
     if notifier is not None and override_manager is not None:
         notifier.override_manager = override_manager
 
+    # --- Phase 7 Plan 02: DepartureTimeStore (proactive departure queries) ---
+    departure_store = None
+    try:
+        departure_store = DepartureTimeStore(default_hour=cfg.ev_charge_deadline_hour)
+        log("info", "DepartureTimeStore: initialized")
+    except Exception as e:
+        log("warning", f"DepartureTimeStore: init failed ({e}), departure queries disabled")
+
+    # Inject departure_store into notifier and web server
+    if notifier is not None and departure_store is not None:
+        notifier.departure_store = departure_store
+    web.departure_store = departure_store
+
     # --- RL bootstrap ---
     if not rl_agent.load():
         max_rec = getattr(cfg, "rl_bootstrap_max_records", 1000)
@@ -226,6 +240,9 @@ def main():
     last_state: Optional[SystemState] = None
     last_rl_action: Optional[Action] = None
     learning_steps = 0
+    # Phase 7 Plan 02: plug-in detection state
+    last_ev_connected = False
+    last_ev_name = ""
     registered_rl_devices: set = {"battery"} | {
         vp.get("evcc_name") or vp.get("name", "")
         for vp in cfg.vehicle_providers
@@ -242,6 +259,19 @@ def main():
                 log("warning", "Could not get system state")
                 time.sleep(60)
                 continue
+
+            # --- Phase 7 Plan 02: Plug-in detection ---
+            # Detect ev_connected False→True transition. Guard against cycles where
+            # ev_name is empty (evcc may not have resolved the vehicle yet): only
+            # update last_ev_connected when we have a name or the EV has disconnected.
+            ev_just_plugged_in = state.ev_connected and not last_ev_connected
+            if ev_just_plugged_in and state.ev_name and notifier and departure_store:
+                if not departure_store.is_inquiry_pending(state.ev_name):
+                    notifier.send_departure_inquiry(state.ev_name, state.ev_soc)
+                    departure_store.mark_inquiry_sent(state.ev_name)
+            if state.ev_name or not state.ev_connected:
+                last_ev_connected = state.ev_connected
+                last_ev_name = state.ev_name or ""
 
             # Fetch prices + forecasts first — needed for percentile computation
             tariffs = evcc.get_tariff_grid()
@@ -305,7 +335,7 @@ def main():
                     tariffs=tariffs,
                     consumption_96=consumption_96,
                     pv_96=pv_96,
-                    ev_departure_times=_get_departure_times(cfg),
+                    ev_departure_times=_get_departure_times(departure_store, cfg, state),
                 )
 
             # --- Phase 7: Check Boost Charge override ---
@@ -479,18 +509,45 @@ def main():
 # Helpers
 # =============================================================================
 
-def _get_departure_times(cfg) -> Dict[str, datetime]:
+def _get_departure_times(departure_store, cfg, state=None) -> Dict[str, datetime]:
     """Return departure datetime per EV name for LP formulation.
 
-    Phase 4: uses cfg.ev_charge_deadline_hour as the single deadline.
-    Phase 7 will extend with per-driver Telegram input.
+    Phase 7 Plan 02: reads per-vehicle departure from DepartureTimeStore when available.
+    Falls back to cfg.ev_charge_deadline_hour (original Phase 4 behaviour) when
+    departure_store is None or no vehicle is currently connected.
+
+    Args:
+        departure_store: DepartureTimeStore instance (may be None for fallback).
+        cfg: Config object with ev_charge_deadline_hour.
+        state: Current SystemState (optional) — used to get connected vehicle name.
+
+    Returns:
+        Dict mapping vehicle_name -> departure datetime (UTC-aware).
     """
     now = datetime.now(timezone.utc)
     deadline_hour = getattr(cfg, 'ev_charge_deadline_hour', 6)
-    local_deadline = now.replace(hour=deadline_hour, minute=0, second=0, microsecond=0)
-    if local_deadline <= now:
-        local_deadline += timedelta(days=1)
-    return {"_default": local_deadline}
+
+    def _default_deadline():
+        d = now.replace(hour=deadline_hour, minute=0, second=0, microsecond=0)
+        if d <= now:
+            d += timedelta(days=1)
+        return d
+
+    if departure_store is None:
+        return {"_default": _default_deadline()}
+
+    # Build per-vehicle dict from DepartureTimeStore
+    result: Dict[str, datetime] = {}
+
+    # Include currently connected vehicle (if any)
+    if state is not None and state.ev_connected and state.ev_name:
+        result[state.ev_name] = departure_store.get(state.ev_name)
+
+    # If no vehicle resolved, fall back to a single default entry
+    if not result:
+        result["_default"] = _default_deadline()
+
+    return result
 
 
 def _action_from_plan(plan, state) -> "Action":

@@ -89,6 +89,8 @@ class WebServer:
         self.plan_snapshotter = None
         # Phase 7: override manager for Boost Charge (wired late by main.py)
         self.override_manager = None
+        # Phase 7 Plan 02: departure time store (wired late by main.py)
+        self.departure_store = None
 
     # ------------------------------------------------------------------
     # Start
@@ -256,6 +258,9 @@ class WebServer:
                 # Phase 7: override status
                 elif path == "/override/status":
                     self._json(srv._api_override_status())
+                # Phase 7 Plan 02: departure times for dashboard polling
+                elif path == "/departure-times":
+                    self._json(srv._api_departure_times())
                 elif path == "/docs":
                     self._html(srv._docs_index())
                 elif path.startswith("/docs/"):
@@ -777,6 +782,20 @@ class WebServer:
         if self.override_manager is None:
             return {"error": "Override nicht verfügbar", "status": 503}
         return self.override_manager.get_status()
+
+    def _api_departure_times(self) -> dict:
+        """Phase 7 Plan 02: GET /departure-times — departure times per vehicle."""
+        if self.departure_store is None:
+            return {"available": False, "departure_times": {}}
+        # Return ISO strings for each vehicle with a stored future departure
+        snap = self._store.snapshot()
+        state = snap.get("state")
+        vehicles = {}
+        # Include connected vehicle if available
+        if state is not None and state.ev_connected and state.ev_name:
+            dep = self.departure_store.get(state.ev_name)
+            vehicles[state.ev_name] = dep.isoformat() if dep else None
+        return {"available": True, "departure_times": vehicles}
 
     def _api_chart_data(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
         snap = self._store.snapshot()

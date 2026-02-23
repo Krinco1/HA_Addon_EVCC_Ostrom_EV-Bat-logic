@@ -12,7 +12,7 @@ Design:
 
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional
 
 import requests
@@ -177,9 +177,14 @@ class NotificationManager:
         self.pending_inquiries: Dict[str, datetime] = {}   # vehicle → sent_at
         # Phase 7: OverrideManager — injected by main.py as late attribute
         self.override_manager = None
+        # Phase 7 Plan 02: DepartureTimeStore — injected by main.py as late attribute
+        self.departure_store = None
+        # Track which vehicle's departure we are currently awaiting free-text reply for
+        self._pending_departure_vehicle: Optional[str] = None
 
         bot.register_callback("soc_", self._handle_soc_callback)
         bot.register_callback("boost_", self._handle_boost_callback)
+        bot.register_callback("depart_", self._handle_departure_callback)
         bot.register_callback("text_handler", self._handle_text_message)
 
     # ------------------------------------------------------------------
@@ -257,6 +262,48 @@ class NotificationManager:
             f"🔄 {done_vehicle} fertig. Bitte <b>{next_vehicle}</b> anstecken.\n{reason}",
         )
 
+    def send_departure_inquiry(self, vehicle_name: str, current_soc: float) -> bool:
+        """Phase 7-02: Ask driver when they need the vehicle.
+
+        Sends a German-language message with 4 inline time buttons. If no
+        specific driver is found for this vehicle, sends to all configured
+        chat_ids. Sets _pending_departure_vehicle for free-text reply matching.
+        """
+        safe_name = vehicle_name.replace(" ", "_")
+        keyboard = [[
+            {"text": "In 2h",       "callback_data": f"depart_{safe_name}_2h"},
+            {"text": "In 4h",       "callback_data": f"depart_{safe_name}_4h"},
+            {"text": "In 8h",       "callback_data": f"depart_{safe_name}_8h"},
+            {"text": "Morgen frueh","callback_data": f"depart_{safe_name}_morgen"},
+        ]]
+
+        msg = (
+            f"Hey, der {vehicle_name} ist angeschlossen! "
+            f"(SoC: {current_soc:.0f}%) Wann brauchst du ihn?"
+        )
+
+        # Find chat_ids to notify
+        driver = self.drivers.get_driver(vehicle_name)
+        if driver and driver.telegram_chat_id:
+            chat_ids = [driver.telegram_chat_id]
+        else:
+            # Fall back to all configured drivers with Telegram
+            chat_ids = [d.telegram_chat_id for d in self.drivers.drivers if d.telegram_chat_id]
+
+        if not chat_ids:
+            log("info", f"Telegram: no chat_id for departure inquiry ({vehicle_name}) — skipped")
+            return False
+
+        sent = False
+        for chat_id in chat_ids:
+            if self.bot.send_message(chat_id, msg, keyboard):
+                sent = True
+
+        if sent:
+            self._pending_departure_vehicle = vehicle_name
+            log("info", f"Telegram: departure inquiry sent for {vehicle_name} (SoC={current_soc:.0f}%)")
+        return sent
+
     # ------------------------------------------------------------------
     # Incoming handlers
     # ------------------------------------------------------------------
@@ -291,6 +338,49 @@ class NotificationManager:
         if self.on_soc_response:
             self.on_soc_response(vehicle, target_soc, chat_id)
 
+    def _handle_departure_callback(self, chat_id: int, callback_data: str):
+        """Phase 7-02: Process departure inline button.
+
+        Callback format: "depart_{safe_vehicle}_{time_str}"
+        Example: "depart_KIA_EV9_4h" → vehicle "KIA EV9", time "4h"
+        """
+        # Strip "depart_" prefix, then split on last "_" to get time_str
+        rest = callback_data[len("depart_"):]
+        # Time token is always the last segment; vehicle uses underscores
+        parts = rest.rsplit("_", 1)
+        if len(parts) != 2:
+            self.bot.send_message(
+                chat_id,
+                "Konnte die Zeit nicht verstehen. Versuch es mit z.B. 'in 3h' oder 'um 14:30'.",
+            )
+            return
+
+        safe_vehicle, time_str = parts
+        vehicle_name = safe_vehicle.replace("_", " ")
+
+        from departure_store import parse_departure_time
+        now = datetime.now(timezone.utc)
+        departure = parse_departure_time(time_str, now)
+
+        if departure is None:
+            self.bot.send_message(
+                chat_id,
+                "Konnte die Zeit nicht verstehen. Versuch es mit z.B. 'in 3h' oder 'um 14:30'.",
+            )
+            return
+
+        if self.departure_store is not None:
+            self.departure_store.set(vehicle_name, departure)
+            self._pending_departure_vehicle = None
+
+        # Display in local time for user-facing confirmation
+        local_departure = departure.astimezone()
+        self.bot.send_message(
+            chat_id,
+            f"Alles klar! {vehicle_name} wird bis {local_departure.strftime('%H:%M')} fertig sein.",
+        )
+        log("info", f"Telegram: departure set for {vehicle_name} -> {departure.isoformat()}")
+
     def _handle_boost_callback(self, chat_id: int, callback_data: str):
         """Process Boost inline button: boost_KIA_EV9 → activate for 'KIA EV9'."""
         # Strip "boost_" prefix, replace underscores back to spaces
@@ -317,7 +407,7 @@ class NotificationManager:
             self.bot.send_message(chat_id, f"Fehler: {result.get('message', 'Unbekannt')}")
 
     def _handle_text_message(self, chat_id: int, text: str):
-        """Process free-text reply: SoC number, /boost command, or /stop command."""
+        """Process free-text reply: SoC number, /boost command, /stop command, or departure time."""
         driver = self.drivers.get_driver_by_chat_id(chat_id)
 
         # /boost command — Phase 7
@@ -329,6 +419,35 @@ class NotificationManager:
         if text.startswith("/stop"):
             self._handle_stop_command(chat_id)
             return
+
+        # Phase 7-02: Check if a departure inquiry is pending — handle free-text departure times
+        # BEFORE falling through to numeric SoC handling (departure times like "in 3h" are not ints)
+        if (
+            self._pending_departure_vehicle is not None
+            and self.departure_store is not None
+            and self.departure_store.is_inquiry_pending(self._pending_departure_vehicle)
+        ):
+            from departure_store import parse_departure_time
+            now = datetime.now(timezone.utc)
+            departure = parse_departure_time(text, now)
+            if departure is not None:
+                self.departure_store.set(self._pending_departure_vehicle, departure)
+                local_departure = departure.astimezone()
+                vehicle_name = self._pending_departure_vehicle
+                self._pending_departure_vehicle = None
+                self.bot.send_message(
+                    chat_id,
+                    f"Alles klar! {vehicle_name} wird bis {local_departure.strftime('%H:%M')} fertig sein.",
+                )
+                log("info", f"Telegram: departure set via free text for {vehicle_name} -> {departure.isoformat()}")
+                return
+            else:
+                # Couldn't parse — hint, but keep pending so they can retry
+                self.bot.send_message(
+                    chat_id,
+                    "Hmm, das hab ich nicht verstanden. Versuch 'in 3h', 'um 14:30' oder tippe auf einen Button oben.",
+                )
+                return
 
         if not driver:
             return
