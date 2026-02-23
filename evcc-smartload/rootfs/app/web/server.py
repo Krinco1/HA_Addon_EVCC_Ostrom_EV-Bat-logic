@@ -59,7 +59,9 @@ class WebServer:
                  # v5 optional
                  sequencer=None, driver_mgr=None, notifier=None,
                  # v6.1: config validation errors
-                 config_errors: List = None):
+                 config_errors: List = None,
+                 # Phase 5: dynamic buffer calculator
+                 buffer_calc=None):
         self.cfg = cfg
         self._store = store
         self.lp = optimizer
@@ -77,6 +79,8 @@ class WebServer:
         self.notifier = notifier
         # v6.1: config errors (may be set before optimizer/RL objects are created)
         self._config_errors = config_errors or []
+        # Phase 5: dynamic buffer
+        self.buffer_calc = buffer_calc
 
     # ------------------------------------------------------------------
     # Start
@@ -329,6 +333,29 @@ class WebServer:
                         return
                     srv.sequencer.remove_request(vehicle)
                     self._json({"ok": True, "vehicle": vehicle})
+
+                # Phase 5: dynamic buffer manual control
+                elif path == "/buffer/activate-live":
+                    if srv.buffer_calc is None:
+                        self._json({"error": "dynamic buffer disabled"}, 503)
+                        return
+                    srv.buffer_calc.activate_live()
+                    self._json({"ok": True, "mode": "live"})
+
+                elif path == "/buffer/extend-obs":
+                    if srv.buffer_calc is None:
+                        self._json({"error": "dynamic buffer disabled"}, 503)
+                        return
+                    days = body.get("days", 14)
+                    try:
+                        days = int(days)
+                        if not 1 <= days <= 90:
+                            raise ValueError
+                    except (ValueError, TypeError):
+                        self._json({"error": "days must be 1-90"}, 400)
+                        return
+                    srv.buffer_calc.extend_observation(extra_days=days)
+                    self._json({"ok": True, "mode": "observation", "extended_days": days})
 
                 else:
                     self._json({"error": "not found"}, 404)

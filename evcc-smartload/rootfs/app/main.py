@@ -203,6 +203,7 @@ def main():
     web.sequencer = sequencer
     web.driver_mgr = driver_mgr
     web.notifier = notifier
+    web.buffer_calc = buffer_calc
 
     # --- Main decision loop ---
     last_state: Optional[SystemState] = None
