@@ -27,7 +27,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 
 - [x] **TRAN-01**: Jede Entscheidung wird mit menschenlesbarer Begründung begleitet ("Lade Kia jetzt weil Preis im unteren 20% und Abfahrt in 6h")
 - [x] **TRAN-02**: Dashboard zeigt 24-48h Zeitstrahl-Ansicht des Plans mit Preis-Overlay und geplanten Lade-/Entladezeitfenstern
-- [ ] **TRAN-03**: Dashboard zeigt RL vs Planer Vergleichsdaten (Win-Rate, Kostenvergleich)
+- [x] **TRAN-03**: Dashboard zeigt RL vs Planer Vergleichsdaten (Win-Rate, Kostenvergleich)
 - [x] **TRAN-04**: Dashboard zeigt historischen Vergleich: was geplant war vs was tatsächlich passiert ist
 
 ### Fahrer-Interaktion
@@ -87,7 +87,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PLAN-05 | Phase 3 | Complete |
 | TRAN-01 | Phase 6 | Complete |
 | TRAN-02 | Phase 6 | Complete |
-| TRAN-03 | Phase 8 | Pending |
+| TRAN-03 | Phase 8 | Complete |
 | TRAN-04 | Phase 6 | Complete |
 | DRIV-01 | Phase 7 | Complete |
 | DRIV-02 | Phase 7 | Complete |

@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day (completed 2026-02-23)
 - [x] **Phase 6: Decision Transparency** - Dashboard shows 24-48h plan timeline, per-slot decision explanations, and planned-vs-actual historical comparison (completed 2026-02-23)
 - [x] **Phase 7: Driver Interaction** - Manual override from dashboard and Telegram, proactive departure-time queries, and driver-context-aware multi-EV prioritization (completed 2026-02-23)
-- [ ] **Phase 8: Residual RL and Learning** - RL agent refactored to delta corrections on planner output, seasonal learner deployed, forecast calibration with confidence factors, RL vs planner comparison in dashboard
+- [x] **Phase 8: Residual RL and Learning** - RL agent refactored to delta corrections on planner output, seasonal learner deployed, forecast calibration with confidence factors, RL vs planner comparison in dashboard (completed 2026-02-23)
 
 ## Phase Details
 
@@ -213,4 +213,4 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 5. Dynamic Buffer | 2/2 | Complete   | 2026-02-23 |
 | 6. Decision Transparency | 2/3 | Complete    | 2026-02-23 |
 | 7. Driver Interaction | 3/3 | Complete    | 2026-02-23 |
-| 8. Residual RL and Learning | 3/4 | In Progress|  |
+| 8. Residual RL and Learning | 4/4 | Complete   | 2026-02-23 |
