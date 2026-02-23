@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 ## Current Position
 
-Phase: 5 of 8 (Dynamic Buffer) — In Progress (1 of 2 plans complete)
-Plan: 1 of 2 in current phase — complete
-Status: Phase 5 Plan 1 complete — DynamicBufferCalc engine, main loop integration, StateStore SSE. Next: Phase 5 Plan 2 (dashboard buffer section + web API endpoints).
-Last activity: 2026-02-23 — DynamicBufferCalc implemented (c40cc68, f45a3ae)
+Phase: 5 of 8 (Dynamic Buffer) — Complete (2 of 2 plans complete, checkpoint pending)
+Plan: 2 of 2 in current phase — complete (awaiting human-verify checkpoint)
+Status: Phase 5 Plan 2 complete — dashboard buffer section, observation banner, SVG chart, event log, POST API endpoints. Awaiting human verification of dashboard UI.
+Last activity: 2026-02-23 — Dashboard buffer UI + web API endpoints implemented (ebe95bb, 4eb0c31)
 
-Progress: [████████░░] 68%
+Progress: [█████████░] 75%
 
 ## Performance Metrics
 
@@ -35,10 +35,11 @@ Progress: [████████░░] 68%
 | Phase 04.2 | 1 | 2 min | 2 min |
 | Phase 04.3 | 1 | 3 min | 3 min |
 | Phase 05 P01 | 1 | 12 min | 12 min |
+| Phase 05 P02 | 1 | 4 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 5 min, 2 min, 3 min, 12 min
-- Trend: stable (Phase 5 Plan 1 larger scope — 3 files, 450+ lines)
+- Last 5 plans: 5 min, 2 min, 3 min, 12 min, 4 min
+- Trend: stable (Phase 5 complete — dashboard UI + API in 4 min)
 
 ## Accumulated Context
 
@@ -56,6 +57,9 @@ Recent decisions affecting current work:
 - [Phase 05-01]: Conservative formula: practical minimum 20% even at highest confidence, hard floor 10%
 - [Phase 05-01]: bat-to-EV takes precedence: buffer_calc.step() skipped when controller._bat_to_ev_active is True
 - [Phase 05-01]: 5% rounding hysteresis applied to target buffer to prevent oscillation between cycles
+- [Phase 05-02]: buffer_calc injected via late attribute assignment (web.buffer_calc = buffer_calc) — consistent with all other components; WebServer started early before buffer_calc is created
+- [Phase 05-02]: SVG chart uses two polylines (obs=dashed/50% opacity, live=solid) for visual mode distinction
+- [Phase 05-02]: confirm() dialog before activateBufferLive() to prevent accidental live activation
 
 ### Pending Todos
 
@@ -69,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 05-01-PLAN.md — DynamicBufferCalc engine (dynamic_buffer.py), main loop integration, StateStore SSE extension with data.buffer payload.
-Next: Phase 5 Plan 2 — dashboard buffer section (buffer chart, observation banner, event log table) + web API endpoints for activate_live / extend_observation
+Stopped at: Completed 05-02-PLAN.md — dashboard buffer section (observation banner, SVG chart, event log, collapsible widget), POST /buffer/activate-live and POST /buffer/extend-obs endpoints. Awaiting Task 3 human-verify checkpoint.
+Next: After user verifies dashboard UI — Phase 5 complete, proceed to Phase 6

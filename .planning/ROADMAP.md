@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4.1: Deploy Configuration** - Version bump to 6.0.0, config.yaml schema completion, repository.yaml channel field (INSERTED — gap closure) (completed 2026-02-22)
 - [x] **Phase 4.2: CI/CD Pipeline** - GitHub Actions multi-arch container build and push to GHCR (INSERTED — gap closure) (completed 2026-02-22)
 - [x] **Phase 4.3: Release Documentation** - CHANGELOG.md and README.md updated for Phases 1-4 features (INSERTED — gap closure) (completed 2026-02-23)
-- [ ] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day
+- [x] **Phase 5: Dynamic Buffer** - Situational minimum battery SoC adapts based on PV forecast confidence, price spread, and time of day (completed 2026-02-23)
 - [ ] **Phase 6: Decision Transparency** - Dashboard shows 24-48h plan timeline, per-slot decision explanations, and planned-vs-actual historical comparison
 - [ ] **Phase 7: Driver Interaction** - Manual override from dashboard and Telegram, proactive departure-time queries, and driver-context-aware multi-EV prioritization
 - [ ] **Phase 8: Residual RL and Learning** - RL agent refactored to delta corrections on planner output, seasonal learner deployed, forecast calibration with confidence factors, RL vs planner comparison in dashboard
@@ -211,7 +211,7 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 4.1 Deploy Configuration | 1/1 | Complete    | 2026-02-22 |
 | 4.2 CI/CD Pipeline | 1/1 | Complete (CI test-only, GHCR abandoned) | 2026-02-23 |
 | 4.3 Release Documentation | 1/1 | Complete | 2026-02-23 |
-| 5. Dynamic Buffer | 1/2 | In Progress|  |
+| 5. Dynamic Buffer | 2/2 | Complete   | 2026-02-23 |
 | 6. Decision Transparency | 0/3 | Not started | - |
 | 7. Driver Interaction | 0/3 | Not started | - |
 | 8. Residual RL and Learning | 0/5 | Not started | - |
