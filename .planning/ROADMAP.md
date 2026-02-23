@@ -212,6 +212,6 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 4.2 CI/CD Pipeline | 1/1 | Complete (CI test-only, GHCR abandoned) | 2026-02-23 |
 | 4.3 Release Documentation | 1/1 | Complete | 2026-02-23 |
 | 5. Dynamic Buffer | 2/2 | Complete   | 2026-02-23 |
-| 6. Decision Transparency | 2/3 | In Progress|  |
+| 6. Decision Transparency | 2/3 | Complete    | 2026-02-23 |
 | 7. Driver Interaction | 0/3 | Not started | - |
 | 8. Residual RL and Learning | 0/5 | Not started | - |
