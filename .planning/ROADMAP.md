@@ -100,20 +100,21 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04.1-01-PLAN.md — Version bump to 6.0.0, config.yaml schema completion (8 LP planner fields), repository.yaml channel, translations
+- [x] 04.1-01-PLAN.md — Version bump to 6.0.0, config.yaml schema completion (8 LP planner fields), repository.yaml channel, translations (completed 2026-02-22)
 
 ### Phase 4.2: CI/CD Pipeline (INSERTED — Gap Closure)
-**Goal**: HA OS devices can install the add-on from a pre-built container image pulled from GHCR
+**Goal**: GitHub Actions validates Dockerfile builds on every push/PR; HA Supervisor builds locally from Dockerfile (standard add-on distribution)
 **Depends on**: Phase 4.1
-**Gap Closure**: Closes DEPLOY-01 (BLOCKER) from v1.0 audit
+**Gap Closure**: Partial DEPLOY-01 — CI test validation in place; distribution via local Dockerfile build (no GHCR pre-built images)
+**Strategy Change (2026-02-23)**: GHCR pre-built image approach abandoned — HA Supervisor was pulling pre-built images instead of building locally. Reverted to standard HA add-on model where Supervisor builds from Dockerfile on device.
 **Success Criteria** (what must be TRUE):
-  1. `config.yaml` has an `image:` key pointing to a GHCR container path
-  2. A GitHub Actions workflow builds multi-arch (amd64, aarch64, armv7) container images on push/tag
-  3. Built images are pushed to GHCR and accessible to HA OS devices
+  1. A GitHub Actions workflow validates Dockerfile builds on push/PR using `--test` flag
+  2. No `image:` key in config.yaml — Supervisor builds locally from Dockerfile
+  3. CI catches Dockerfile build errors before they reach users
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04.2-01-PLAN.md — Add GHCR image key to config.yaml, GitHub Actions build+push workflow (home-assistant/builder@2025.09.0), post-push GHCR visibility checkpoint
+- [x] 04.2-01-PLAN.md — CI test workflow with home-assistant/builder@2025.09.0 (GHCR approach abandoned, test-only retained) (completed 2026-02-23)
 
 ### Phase 4.3: Release Documentation (INSERTED — Gap Closure)
 **Goal**: CHANGELOG.md and README.md accurately describe all Phases 1-4 features, APIs, and architecture
@@ -123,10 +124,10 @@ Plans:
   1. CHANGELOG.md has entries for v5.1 through v6.0 covering all Phase 1-4 features
   2. README.md architecture section describes StateStore, forecasters, HorizonPlanner, and LP dispatch
   3. README.md API table lists `/forecast`, `/events`, and all other endpoints
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04.3-01-PLAN.md — CHANGELOG.md v5.1-v6.0 entries, README.md architecture and API updates
+- [ ] 04.3-01-PLAN.md — CHANGELOG.md v5.1-v6.0 entries, README.md architecture and API updates (2 tasks: changelog entries + readme updates)
 
 ### Phase 5: Dynamic Buffer
 **Goal**: The battery minimum SoC adapts situationally — higher when PV forecast confidence is low or prices are flat, lower when cheap solar is reliably incoming
@@ -206,8 +207,8 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 2. Vehicle Reliability | 2/2 | Complete    | 2026-02-22 |
 | 3. Data Foundation | 3/3 | Complete   | 2026-02-22 |
 | 4. Predictive Planner | 3/3 | Complete    | 2026-02-22 |
-| 4.1 Deploy Configuration | 0/1 | Complete    | 2026-02-22 |
-| 4.2 CI/CD Pipeline | 1/1 | Complete   | 2026-02-22 |
+| 4.1 Deploy Configuration | 1/1 | Complete    | 2026-02-22 |
+| 4.2 CI/CD Pipeline | 1/1 | Complete (CI test-only, GHCR abandoned) | 2026-02-23 |
 | 4.3 Release Documentation | 0/1 | Not started | - |
 | 5. Dynamic Buffer | 0/1 | Not started | - |
 | 6. Decision Transparency | 0/3 | Not started | - |
