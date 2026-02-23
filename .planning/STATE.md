@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** The system makes the economically best energy decision at every moment using all available information — and the user understands why
-**Current focus:** Phase 5 (Dynamic Buffer) — in progress
+**Current focus:** Phase 6 (Decision Transparency) — context gathered, ready to plan
 
 ## Current Position
 
-Phase: 5 of 8 (Dynamic Buffer) — Complete (2 of 2 plans complete, checkpoint pending)
-Plan: 2 of 2 in current phase — complete (awaiting human-verify checkpoint)
-Status: Phase 5 Plan 2 complete — dashboard buffer section, observation banner, SVG chart, event log, POST API endpoints. Awaiting human verification of dashboard UI.
-Last activity: 2026-02-23 — Dashboard buffer UI + web API endpoints implemented (ebe95bb, 4eb0c31)
+Phase: 6 of 8 (Decision Transparency) — Context gathered, ready to plan
+Plan: 0 of 3 in current phase — not started
+Status: Phase 6 context gathered — Timeline (Gantt+Preisoverlay), Erklärungen (DE, Progressive Disclosure), Historie (Chart+Tabelle, kostenbasiert), Tabs-Integration
+Last activity: 2026-02-23 — Phase 6 context discussion completed (4cd8316)
 
 Progress: [█████████░] 75%
 
@@ -73,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 05-02-PLAN.md — dashboard buffer section (observation banner, SVG chart, event log, collapsible widget), POST /buffer/activate-live and POST /buffer/extend-obs endpoints. Awaiting Task 3 human-verify checkpoint.
-Next: After user verifies dashboard UI — Phase 5 complete, proceed to Phase 6
+Stopped at: Phase 6 context gathered — all 4 areas discussed (Timeline, Erklärungen, Historie, Integration)
+Next: Plan Phase 6 → /gsd:plan-phase 6
