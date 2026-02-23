@@ -20,6 +20,10 @@ let currentSeqVehicle = '';
 var _sseSource = null;
 var _sseLastUpdate = null;  // ISO string from last SSE message
 
+// Phase 7: Override/Boost-Charge state
+var _overrideStatus = { active: false };
+var _overridePollInterval = null;
+
 function $(id) { return document.getElementById(id); }
 
 function socColor(soc) {
@@ -507,6 +511,29 @@ function renderDevice(dev, deviceId, vehicleInfo) {
         h += '<div style="margin-top:10px;">';
         h += '<button class="btn-manual" onclick="openModal(\'' + deviceId + '\',\'' + name + '\',' + cap + ')">\u270F\uFE0F SoC manuell eingeben</button>';
         if (!isManual) h += ' <span style="margin-left:10px;font-size:0.85em;color:#888;">(keine API verf\u00FCgbar)</span>';
+        h += '</div>';
+    }
+
+    // Phase 7: Boost Charge button for vehicle cards (not battery)
+    if (deviceId !== 'battery') {
+        var boostBtnId = 'boost-btn-' + deviceId.replace(/\s/g, '_');
+        var boostMsgId = boostBtnId + '-msg';
+        var isOverrideActive = _overrideStatus && _overrideStatus.active && _overrideStatus.vehicle === name;
+        var isOtherOverrideActive = _overrideStatus && _overrideStatus.active && _overrideStatus.vehicle !== name;
+
+        h += '<div style="margin-top:10px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">';
+        if (isOverrideActive) {
+            var remaining = (_overrideStatus.remaining_minutes || 0).toFixed(0);
+            h += '<button id="' + boostBtnId + '" class="boost-btn boost-active" disabled>Boost aktiv \u2014 ' + remaining + ' Min</button>';
+            h += '<button class="boost-btn boost-cancel" onclick="cancelBoost()">Override stoppen</button>';
+        } else {
+            h += '<button id="' + boostBtnId + '" class="boost-btn" onclick="activateBoost(\'' + name.replace(/'/g, "\\'") + '\',\'' + boostBtnId + '\')">';
+            h += '\u26A1 Boost Charge</button>';
+            if (isOtherOverrideActive) {
+                h += '<span style="font-size:0.8em;color:#888;">(anderes Fahrzeug aktiv)</span>';
+            }
+        }
+        h += '<span id="' + boostMsgId + '" style="display:none;font-size:0.85em;color:#ffaa00;"></span>';
         h += '</div>';
     }
 
@@ -1338,6 +1365,112 @@ async function extendBufferObs() {
 }
 
 // =============================================================================
+// Phase 7: Boost Charge override
+// =============================================================================
+
+/**
+ * Fetch current override status from GET /override/status and update
+ * _overrideStatus. Then refresh vehicle cards if on Status tab.
+ */
+function fetchOverrideStatus() {
+    fetchJSON('/override/status').then(function(data) {
+        if (!data) return;
+        _overrideStatus = data;
+        // Refresh vehicle cards to reflect current override state
+        var container = $('devicesContainer');
+        if (container && container.innerHTML) {
+            // Re-render device cards with updated override state by triggering a slot refresh
+            fetchJSON('/slots').then(function(slots) {
+                if (!slots) return;
+                fetchJSON('/vehicles').then(function(vehicles) {
+                    if (slots) renderSlots(slots, vehicles);
+                });
+            });
+        }
+    });
+}
+
+/**
+ * Activate Boost Charge for a vehicle via POST /override/boost.
+ * Updates the UI inline on the vehicle card with result.
+ * @param {string} vehicleName  Display name of the vehicle
+ * @param {string} btnId  ID of the boost button element for inline feedback
+ */
+async function activateBoost(vehicleName, btnId) {
+    var btn = btnId ? $(btnId) : null;
+    if (btn) {
+        btn.textContent = 'Wird aktiviert...';
+        btn.disabled = true;
+    }
+    try {
+        var resp = await fetch('/override/boost', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vehicle: vehicleName }),
+        });
+        var data = await resp.json();
+
+        if (data.ok) {
+            _overrideStatus = { active: true, vehicle: vehicleName, remaining_minutes: data.remaining_minutes || 90, expires_at: data.expires_at };
+            // Start polling override status every 60 seconds
+            if (_overridePollInterval) clearInterval(_overridePollInterval);
+            _overridePollInterval = setInterval(fetchOverrideStatus, 60000);
+            // Refresh cards to show active state
+            fetchJSON('/slots').then(function(slots) {
+                fetchJSON('/vehicles').then(function(vehicles) {
+                    if (slots) renderSlots(slots, vehicles);
+                });
+            });
+        } else if (data.quiet_hours_blocked) {
+            // Show quiet-hours block message inline
+            if (btn) {
+                btn.textContent = 'Gesperrt: Leise-Stunden';
+                btn.disabled = false;
+                btn.className = 'boost-btn boost-blocked';
+            }
+            // Show message near the button
+            var msgId = btnId ? btnId + '-msg' : null;
+            var msgEl = msgId ? $(msgId) : null;
+            if (msgEl) {
+                msgEl.textContent = data.message || 'Leise-Stunden aktiv';
+                msgEl.style.display = 'block';
+            }
+        } else {
+            if (btn) {
+                btn.textContent = 'Boost Charge';
+                btn.disabled = false;
+            }
+            console.error('Boost activation failed:', data);
+        }
+    } catch (e) {
+        if (btn) { btn.textContent = 'Boost Charge'; btn.disabled = false; }
+        console.error('Boost activation error:', e);
+    }
+}
+
+/**
+ * Cancel the active Boost Charge override via POST /override/cancel.
+ */
+async function cancelBoost() {
+    try {
+        var resp = await fetch('/override/cancel', { method: 'POST' });
+        var data = await resp.json();
+        if (data.ok || data.cancelled) {
+            _overrideStatus = { active: false };
+            if (_overridePollInterval) { clearInterval(_overridePollInterval); _overridePollInterval = null; }
+        }
+        // Refresh vehicle cards
+        fetchJSON('/slots').then(function(slots) {
+            fetchJSON('/vehicles').then(function(vehicles) {
+                if (slots) renderSlots(slots, vehicles);
+            });
+        });
+    } catch (e) {
+        console.error('Cancel boost error:', e);
+    }
+}
+
+// =============================================================================
 // v6: SSE — Live state push
 // =============================================================================
 
@@ -1448,6 +1581,11 @@ function applySSEUpdate(msg) {
     // v8: Dynamic buffer section update via SSE
     if (msg.buffer) {
         updateBufferSection(msg.buffer);
+    }
+
+    // Phase 7: Override status in SSE payload
+    if (msg.override !== undefined) {
+        _overrideStatus = msg.override || { active: false };
     }
 }
 
@@ -1941,6 +2079,18 @@ function renderPlanGantt(slots, computedAt) {
         legX += leg.label.length * 5.5 + 24;
     }
 
+    // --- Phase 7: Override / Boost Charge marker ---
+    // If a Boost override is currently active, draw an orange banner at the top of slot 0
+    if (_overrideStatus && _overrideStatus.active) {
+        var bannerH = 18;
+        s += '<rect x="' + marginL + '" y="' + marginT + '" width="' + (slotW * 4).toFixed(1) + '" height="' + bannerH + '" fill="#ff6600" opacity="0.75" rx="2"/>';
+        s += '<text x="' + (marginL + 4) + '" y="' + (marginT + 13) + '" fill="#fff" font-size="9" font-family="sans-serif" font-weight="bold">Boost Charge aktiv';
+        if (_overrideStatus.remaining_minutes != null) {
+            s += ' (' + Math.round(_overrideStatus.remaining_minutes) + ' Min)';
+        }
+        s += '</text>';
+    }
+
     s += '</svg>';
 
     // Inject SVG into DOM
@@ -2069,3 +2219,6 @@ if (typeof EventSource !== 'undefined') {
 } else {
     setSseIndicator('error');
 }
+
+// Phase 7: Initial override status fetch
+fetchOverrideStatus();

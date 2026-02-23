@@ -205,6 +205,14 @@
         .tab-btn { padding:8px 16px; border:1px solid var(--border, #444); background:var(--card-bg, #1a1a2e); color:var(--text, #e0e0e0); border-radius:6px 6px 0 0; cursor:pointer; font-size:14px; border-bottom:none; }
         .tab-btn.active { background:var(--accent, #00d4aa); color:#000; font-weight:bold; }
         .tab-panel { /* layout handled by existing card styles */ }
+
+        /* Phase 7: Boost Charge button styles */
+        .boost-btn { background: #0f3460; color: #ff8800; border: 1px solid #ff8800; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: bold; transition: background 0.2s; }
+        .boost-btn:hover:not(:disabled) { background: #1a2e5e; border-color: #ffaa00; color: #ffaa00; }
+        .boost-btn:disabled { opacity: 0.7; cursor: default; }
+        .boost-btn.boost-active { background: #2e1a00; color: #ff8800; border-color: #ff8800; }
+        .boost-btn.boost-blocked { background: #1a1a2e; color: #888; border-color: #555; }
+        .boost-btn.boost-cancel { background: #2e0a0a; color: #ff4444; border: 1px solid #ff4444; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
     </style>
 </head>
 <body>

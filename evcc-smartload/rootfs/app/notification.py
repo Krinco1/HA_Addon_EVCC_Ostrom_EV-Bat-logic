@@ -158,6 +158,11 @@ class NotificationManager:
       1. Main loop detects charge opportunity → send_charge_inquiry()
       2. Driver taps inline button  → _handle_soc_callback()
       3. on_soc_response(vehicle, target_soc) → ChargeSequencer.add_request()
+
+    Phase 7 additions:
+      - /boost [Fahrzeug] command → activate Boost Charge override
+      - /stop command → cancel active override
+      - boost_ inline button callback → activate Boost Charge
     """
 
     def __init__(
@@ -170,8 +175,11 @@ class NotificationManager:
         self.drivers = driver_manager
         self.on_soc_response = on_soc_response
         self.pending_inquiries: Dict[str, datetime] = {}   # vehicle → sent_at
+        # Phase 7: OverrideManager — injected by main.py as late attribute
+        self.override_manager = None
 
         bot.register_callback("soc_", self._handle_soc_callback)
+        bot.register_callback("boost_", self._handle_boost_callback)
         bot.register_callback("text_handler", self._handle_text_message)
 
     # ------------------------------------------------------------------
@@ -200,12 +208,15 @@ class NotificationManager:
             if age_h < 2:
                 return False
 
+        # Build vehicle key for boost callback (replace spaces with underscores)
+        vehicle_key = vehicle_name.replace(" ", "_")
         keyboard = [
             [
                 {"text": f"🔋 {s}%", "callback_data": f"soc_{vehicle_name}_{s}"}
                 for s in options
             ]
-            + [{"text": "❌ Nein", "callback_data": f"soc_{vehicle_name}_skip"}]
+            + [{"text": "❌ Nein", "callback_data": f"soc_{vehicle_name}_skip"}],
+            [{"text": "⚡ Jetzt laden!", "callback_data": f"boost_{vehicle_key}"}],
         ]
 
         msg = (
@@ -280,9 +291,45 @@ class NotificationManager:
         if self.on_soc_response:
             self.on_soc_response(vehicle, target_soc, chat_id)
 
+    def _handle_boost_callback(self, chat_id: int, callback_data: str):
+        """Process Boost inline button: boost_KIA_EV9 → activate for 'KIA EV9'."""
+        # Strip "boost_" prefix, replace underscores back to spaces
+        vehicle_key = callback_data[len("boost_"):]
+        vehicle_name = vehicle_key.replace("_", " ")
+
+        log("info", f"Telegram: Boost callback for {vehicle_name} from chat {chat_id}")
+
+        if self.override_manager is None:
+            self.bot.send_message(chat_id, "Boost Charge nicht verfügbar.")
+            return
+
+        result = self.override_manager.activate(vehicle_name, "telegram", chat_id)
+        if result.get("ok"):
+            from override_manager import OVERRIDE_DURATION_MINUTES
+            self.bot.send_message(
+                chat_id,
+                f"Boost Charge für <b>{vehicle_name}</b> aktiviert! "
+                f"Läuft {OVERRIDE_DURATION_MINUTES} Minuten.",
+            )
+        elif result.get("quiet_hours_blocked"):
+            self.bot.send_message(chat_id, result.get("message", "Leise-Stunden aktiv."))
+        else:
+            self.bot.send_message(chat_id, f"Fehler: {result.get('message', 'Unbekannt')}")
+
     def _handle_text_message(self, chat_id: int, text: str):
-        """Process free-text reply (e.g. '80' as SoC)."""
+        """Process free-text reply: SoC number, /boost command, or /stop command."""
         driver = self.drivers.get_driver_by_chat_id(chat_id)
+
+        # /boost command — Phase 7
+        if text.startswith("/boost"):
+            self._handle_boost_command(chat_id, text, driver)
+            return
+
+        # /stop command — Phase 7
+        if text.startswith("/stop"):
+            self._handle_stop_command(chat_id)
+            return
+
         if not driver:
             return
         try:
@@ -294,6 +341,56 @@ class NotificationManager:
                         return
         except ValueError:
             pass
+
+    def _handle_boost_command(self, chat_id: int, text: str, driver):
+        """/boost [Fahrzeug] — activate Boost Charge for named (or default) vehicle."""
+        if self.override_manager is None:
+            self.bot.send_message(chat_id, "Boost Charge nicht verfügbar.")
+            return
+
+        # Parse vehicle name from command: "/boost KIA EV9" → "KIA EV9"
+        parts = text.strip().split(None, 1)
+        vehicle_name = parts[1].strip() if len(parts) > 1 else ""
+
+        # If no vehicle specified, use driver's first vehicle (if only one exists)
+        if not vehicle_name and driver and len(driver.vehicles) == 1:
+            vehicle_name = driver.vehicles[0]
+
+        if not vehicle_name:
+            self.bot.send_message(
+                chat_id,
+                "Bitte Fahrzeug angeben: /boost KIA EV9\nOder nutze den Inline-Button."
+            )
+            return
+
+        log("info", f"Telegram: /boost command for {vehicle_name} from chat {chat_id}")
+        result = self.override_manager.activate(vehicle_name, "telegram", chat_id)
+
+        if result.get("ok"):
+            from override_manager import OVERRIDE_DURATION_MINUTES
+            self.bot.send_message(
+                chat_id,
+                f"Boost Charge für <b>{vehicle_name}</b> aktiviert! "
+                f"Läuft {OVERRIDE_DURATION_MINUTES} Minuten.",
+            )
+        elif result.get("quiet_hours_blocked"):
+            self.bot.send_message(chat_id, result.get("message", "Leise-Stunden aktiv."))
+        else:
+            self.bot.send_message(chat_id, f"Fehler: {result.get('message', 'Unbekannt')}")
+
+    def _handle_stop_command(self, chat_id: int):
+        """/stop — cancel the active Boost Charge override."""
+        if self.override_manager is None:
+            self.bot.send_message(chat_id, "Override-Manager nicht verfügbar.")
+            return
+
+        log("info", f"Telegram: /stop command from chat {chat_id}")
+        result = self.override_manager.cancel()
+
+        if result.get("ok"):
+            self.bot.send_message(chat_id, "Override gestoppt — Planer übernimmt.")
+        else:
+            self.bot.send_message(chat_id, "Kein aktiver Override.")
 
     def get_pending(self) -> Dict[str, str]:
         """Return pending inquiries with age for dashboard display."""
