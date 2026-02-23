@@ -195,10 +195,24 @@ Plans:
 - [x] 08-04-PLAN.md — Dashboard "Lernen" tab with German labels, GET /rl-learning and /rl-audit endpoints, constraint audit display
 - [ ] 08-05-PLAN.md — Gap closure: fix audit checklist array-vs-dict mismatch in app.js
 
+### Phase 8.1: Seasonal Feedback + Phase 5 Verification (INSERTED — Gap Closure)
+**Goal**: SeasonalLearner corrections flow into HorizonPlanner LP objective, and Phase 5 Dynamic Buffer has formal verification
+**Depends on**: Phase 8
+**Requirements**: LERN-02, PLAN-03
+**Gap Closure**: Closes LERN-02 (seasonal feedback loop unwired) and PLAN-03 (missing verification) from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `SeasonalLearner.get_correction_factor()` is called in main.py and its output is passed to `HorizonPlanner.plan()` as a seasonal cost correction
+  2. The LP solver incorporates the seasonal correction when computing dispatch decisions — slots in seasons with historically high plan errors get adjusted cost coefficients
+  3. Phase 5 Dynamic Buffer has a VERIFICATION.md confirming all must_haves against the actual codebase
+**Plans**: TBD
+
+Plans:
+- [ ] 08.1-01: Wire SeasonalLearner.get_correction_factor() into main.py → HorizonPlanner.plan() → _solve_lp() as seasonal cost offset; verify Phase 5 DynamicBufferCalc
+
 ## Progress
 
 **Execution Order:**
-Phases execute in dependency order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
+Phases execute in dependency order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 8.1
 Note: Phase 3 can begin in parallel with Phase 2 (both depend only on Phase 1).
 Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 
@@ -215,3 +229,4 @@ Note: Phases 5, 6, and 7 can begin in parallel (all depend on Phase 4).
 | 6. Decision Transparency | 2/3 | Complete    | 2026-02-23 |
 | 7. Driver Interaction | 3/3 | Complete    | 2026-02-23 |
 | 8. Residual RL and Learning | 5/5 | Complete   | 2026-02-23 |
+| 8.1 Seasonal Feedback + Phase 5 Verification | 0/1 | Not started | - |

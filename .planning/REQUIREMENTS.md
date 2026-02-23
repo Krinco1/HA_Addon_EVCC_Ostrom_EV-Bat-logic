@@ -19,7 +19,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 
 - [x] **PLAN-01**: System erstellt einen 24-48h Rolling-Horizon Energieplan der Batterie und EV gemeinsam optimiert
 - [x] **PLAN-02**: Statische Euro-Ladegrenzen (ev_max_price_ct, battery_max_price_ct) werden durch dynamische planbasierte Optimierung ersetzt
-- [x] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
+- [ ] **PLAN-03**: Hausakku-Mindest-SoC passt sich situationsabhängig an (Tageszeit, PV-Prognose, erwarteter Verbrauch, Preislage)
 - [x] **PLAN-04**: Hausverbrauch wird aus HA-Datenbank/InfluxDB-Historie hochgerechnet und in Planung berücksichtigt
 - [x] **PLAN-05**: PV-Ertragsprognose wird via evcc Solar-Tariff API bezogen und in den 24-48h Plan integriert
 
@@ -39,7 +39,7 @@ Requirements for v6.0 release. Each maps to roadmap phases.
 ### Lernendes System
 
 - [x] **LERN-01**: RL-Agent lernt Korrekturen zum Planer (Residual Learning) statt eigenständige Entscheidungen
-- [x] **LERN-02**: System erkennt und adaptiert saisonale Muster (Verbrauch, PV-Ertrag, Preisverhalten über Jahreszeiten)
+- [ ] **LERN-02**: System erkennt und adaptiert saisonale Muster (Verbrauch, PV-Ertrag, Preisverhalten über Jahreszeiten)
 - [x] **LERN-03**: System lernt angemessene Reaktionszeiten (wann Plan sofort anpassen vs Abweichung abwarten)
 - [x] **LERN-04**: System lernt die Zuverlässigkeit aller Prognosen (PV, Preis, Verbrauch) und korrigiert künftige Planungen mit Konfidenz-Faktoren
 
@@ -82,7 +82,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RELI-05 | Phase 2 | Complete — 02-02-PLAN.md |
 | PLAN-01 | Phase 4 | Complete |
 | PLAN-02 | Phase 4 | Complete |
-| PLAN-03 | Phase 5 | Complete |
+| PLAN-03 | Phase 8.1 | Pending — missing verification (code works, integration confirmed) |
 | PLAN-04 | Phase 3 | Complete |
 | PLAN-05 | Phase 3 | Complete |
 | TRAN-01 | Phase 6 | Complete |
@@ -93,7 +93,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRIV-02 | Phase 7 | Complete |
 | DRIV-03 | Phase 7 | Complete |
 | LERN-01 | Phase 8 | Complete |
-| LERN-02 | Phase 8 | Complete |
+| LERN-02 | Phase 8.1 | Pending — feedback loop unwired (accumulates but doesn't apply corrections) |
 | LERN-03 | Phase 8 | Complete |
 | LERN-04 | Phase 8 | Complete |
 
