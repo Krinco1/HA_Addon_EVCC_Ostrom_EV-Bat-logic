@@ -34,15 +34,15 @@ class Config:
     """All configuration options with sensible defaults."""
 
     # --- evcc connection ---
-    evcc_url: str = "http://192.168.1.66:7070"
+    evcc_url: str = "http://evcc.local:7070"
     evcc_password: str = ""
 
     # --- InfluxDB ---
-    influxdb_host: str = "192.168.1.67"
+    influxdb_host: str = "influxdb.local"
     influxdb_port: int = 8086
-    influxdb_database: str = "smartprice"
-    influxdb_username: str = "smartprice"
-    influxdb_password: str = "smartprice"
+    influxdb_database: str = "smartload"
+    influxdb_username: str = ""
+    influxdb_password: str = ""
     influxdb_ssl: bool = False          # v5.0.2: HTTPS for InfluxDB connection
 
     # --- Home battery ---

@@ -22,4 +22,5 @@ jobs:
           args: |
             --test \
             --all \
-            --target evcc-smartload
+            --target evcc-smartload \
+            --docker-hub ghcr.io/krinco1

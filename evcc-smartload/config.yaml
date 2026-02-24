@@ -19,13 +19,13 @@ ports:
 ports_description:
   8099/tcp: "EVCC-Smartload API & Dashboard"
 options:
-  evcc_url: "http://192.168.1.66:7070"
+  evcc_url: "http://evcc.local:7070"
   evcc_password: ""
-  influxdb_host: "192.168.1.67"
+  influxdb_host: "influxdb.local"
   influxdb_port: 8086
   influxdb_database: "smartload"
-  influxdb_username: "smartload"
-  influxdb_password: "smartload"
+  influxdb_username: ""
+  influxdb_password: ""
   influxdb_ssl: false
   battery_capacity_kwh: 33.1
   battery_max_price_ct: 25.0
