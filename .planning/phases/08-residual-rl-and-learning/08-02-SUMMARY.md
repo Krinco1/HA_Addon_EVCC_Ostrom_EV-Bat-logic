@@ -101,6 +101,14 @@ None - no external service configuration required. Both modules begin accumulati
 - Phase 8 plan 03 (RL agent wiring) can import both and call update() each cycle
 - Data accumulation starts immediately on deployment; correction factors become available after ~10 plan cycles per cell
 
+## Self-Check: PASSED
+
+- FOUND: evcc-smartload/rootfs/app/seasonal_learner.py
+- FOUND: evcc-smartload/rootfs/app/forecast_reliability.py
+- FOUND: .planning/phases/08-residual-rl-and-learning/08-02-SUMMARY.md
+- FOUND: commit b86cff0 (feat(08-02): SeasonalLearner)
+- FOUND: commit 808ab3d (feat(08-02): ForecastReliabilityTracker)
+
 ---
 *Phase: 08-residual-rl-and-learning*
 *Completed: 2026-02-23*

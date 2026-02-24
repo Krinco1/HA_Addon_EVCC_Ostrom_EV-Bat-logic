@@ -131,5 +131,13 @@ None - no external service configuration required.
 - Blocker noted in STATE.md: RL constraint audit requires 30-day shadow period before advisory promotion; SeasonalLearner needs months for statistically meaningful cells
 
 ---
+## Self-Check: PASSED
+
+- `evcc-smartload/rootfs/app/reaction_timing.py` — FOUND
+- `.planning/phases/08-residual-rl-and-learning/08-03-SUMMARY.md` — FOUND
+- Commit `851f85c` (Task 1) — FOUND
+- Commit `fe85803` (Task 2) — FOUND
+
+---
 *Phase: 08-residual-rl-and-learning*
 *Completed: 2026-02-23*
