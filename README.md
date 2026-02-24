@@ -23,7 +23,7 @@ Home Assistant Add-on Repository für **EVCC-Smartload** — intelligentes Energ
 
 | Add-on | Beschreibung | Version |
 |---|---|---|
-| [EVCC-Smartload](evcc-smartload/) | Predictiver LP+RL Optimizer für Batterie & EV-Ladung mit 24h Horizont | 6.0.0 |
+| [EVCC-Smartload](evcc-smartload/) | Predictiver LP+RL Optimizer für Batterie & EV-Ladung mit 24h Horizont | 6.0.1 |
 
 ## Features
 

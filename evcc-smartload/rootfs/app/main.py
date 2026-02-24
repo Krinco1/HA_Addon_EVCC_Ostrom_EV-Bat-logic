@@ -654,7 +654,7 @@ def main():
                 if plan_slot0_cost is not None and actual_slot0_cost is not None and last_state is not None:
                     try:
                         reward = rl_agent.calculate_reward(plan_slot0_cost, actual_slot0_cost)
-                        rl_agent.learn_from_correction(state, _rl_action_idx, reward, state)
+                        rl_agent.learn_from_correction(last_state, _rl_action_idx, reward, state)
                         learning_steps += 1
                         if learning_steps % 50 == 0:
                             log("info", f"RL: {learning_steps} correction steps, ε={rl_agent.epsilon:.3f}")

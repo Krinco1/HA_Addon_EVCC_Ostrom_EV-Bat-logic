@@ -2,6 +2,30 @@
 
 ---
 
+## v6.0.1 — Bugfix: RL-Learning State-Transition + Repo-Bereinigung
+
+### Bugfix
+
+**RL learn_from_correction() State-Parameter vertauscht**
+- `learn_from_correction(state, action, reward, state)` übergab denselben State als State und Next-State
+- Q-Learning konnte keine echten State-Übergänge lernen (Q[s,a] → Q[s',a'] war identisch)
+- Fix: `learn_from_correction(last_state, action, reward, state)` — korrekte Transition
+
+### Repo-Bereinigung
+
+- Private IPs (192.168.1.x) durch generische Platzhalter ersetzt (evcc.local, influxdb.local)
+- Default-Passwörter neutralisiert (leere Strings)
+- `.planning/` Entwicklungsdokumentation aus öffentlichem Repo entfernt
+- MIT-Lizenz hinzugefügt
+- Duplizierte Dateien entfernt (Root-CHANGELOG, vehicles.yaml.example)
+- DOCS.md aktualisiert: fehlende Endpoints `/forecast`, `/events`, Override-Endpoints ergänzt
+- Translations (en/de) aktualisiert
+- CI-Workflow entfernt (HA Supervisor baut lokal)
+- Stale `claude/*` Remote-Branches gelöscht
+- GitHub-Repository-Beschreibung gesetzt
+
+---
+
 ## v6.0.0 — Predictiver LP-Planner + PV/Verbrauchs-Prognose + Config-Validierung
 
 ### Neue Features
