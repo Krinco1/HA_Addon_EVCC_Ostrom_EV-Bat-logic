@@ -23,4 +23,5 @@ jobs:
             --test \
             --all \
             --target evcc-smartload \
-            --docker-hub ghcr.io/krinco1
+            --docker-hub ghcr.io/krinco1 \
+            --image ha_addon_evcc-smartload-{arch}
