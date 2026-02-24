@@ -8,7 +8,7 @@ Intelligentes Energiemanagement für Home Assistant — optimiert Hausbatterie u
 
 | Option | Beschreibung | Standard |
 |---|---|---|
-| `evcc_url` | URL des evcc-Servers | `http://192.168.1.66:7070` |
+| `evcc_url` | URL des evcc-Servers | `http://evcc.local:7070` |
 | `evcc_password` | evcc Passwort (optional) | leer |
 | `battery_capacity_kwh` | Hausbatterie-Kapazität in kWh | `33.1` |
 | `battery_max_price_ct` | Max. Preis für Batterieladung (ct/kWh) | `25.0` |
@@ -20,11 +20,11 @@ Intelligentes Energiemanagement für Home Assistant — optimiert Hausbatterie u
 
 | Option | Beschreibung | Standard |
 |---|---|---|
-| `influxdb_host` | InfluxDB Server-Adresse | `192.168.1.67` |
+| `influxdb_host` | InfluxDB Server-Adresse | `influxdb.local` |
 | `influxdb_port` | InfluxDB Port | `8086` |
 | `influxdb_database` | Datenbankname | `smartload` |
-| `influxdb_username` | Benutzername | `smartload` |
-| `influxdb_password` | Passwort | `smartload` |
+| `influxdb_username` | Benutzername | leer |
+| `influxdb_password` | Passwort | leer |
 | `influxdb_ssl` | SSL/HTTPS verwenden | `false` |
 
 ### Reinforcement Learning
@@ -107,5 +107,9 @@ Nach dem Start erreichbar unter **WEB UI** in der Add-on-Oberfläche oder direkt
 | GET | `/decisions` | Letzte Entscheidungen |
 | GET | `/comparisons` | LP-vs-RL Statistiken |
 | POST | `/vehicles/manual-soc` | Manuellen SoC setzen |
+| GET | `/forecast` | 96-Slot Verbrauchs-/PV-Prognose mit Confidence |
+| GET | `/events` | SSE-Stream für Live-Dashboard-Updates |
 | POST | `/sequencer/request` | Lade-Anfrage stellen |
 | POST | `/sequencer/cancel` | Lade-Anfrage abbrechen |
+| POST | `/override/boost` | Sofort-Ladung erzwingen |
+| POST | `/override/cancel` | Override abbrechen |

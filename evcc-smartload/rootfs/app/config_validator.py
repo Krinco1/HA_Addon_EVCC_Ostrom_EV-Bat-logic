@@ -66,7 +66,7 @@ class ConfigValidator:
                 severity="critical",
                 message=(
                     "evcc_url muss eine gueltige HTTP-URL sein "
-                    "(z.B. http://192.168.1.66:7070)"
+                    "(z.B. http://evcc.local:7070)"
                 ),
                 suggestion=(
                     "Pruefe die IP-Adresse und Port deines evcc-Servers"
@@ -199,7 +199,7 @@ class ConfigValidator:
         db = getattr(cfg, "influxdb_database", "") if hasattr(cfg, "influxdb_database") else ""
         # If host is the default placeholder but database was customised,
         # the user may have partially configured InfluxDB.
-        if host == "192.168.1.67" and db and db != "smartprice":
+        if host == "influxdb.local" and db and db != "smartload":
             results.append(ValidationResult(
                 field="influxdb_host",
                 value=host,

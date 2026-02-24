@@ -1,7 +1,7 @@
 configuration:
   evcc_url:
     name: evcc URL
-    description: URL des evcc-Servers (z.B. http://192.168.1.66:7070)
+    description: URL des evcc-Servers (z.B. http://evcc.local:7070)
   evcc_password:
     name: evcc Passwort
     description: Passwort für evcc API-Zugriff (leer lassen wenn nicht gesetzt)

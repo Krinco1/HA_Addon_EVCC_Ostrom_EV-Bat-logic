@@ -3,5 +3,4 @@ __pycache__/
 .idea/
 .vscode/
 *.db
-*.json
 .planning/

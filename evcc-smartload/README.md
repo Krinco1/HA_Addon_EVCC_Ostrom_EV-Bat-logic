@@ -36,7 +36,7 @@
 ### config.yaml (Add-on Optionen)
 
 ```yaml
-evcc_url: "http://192.168.1.66:7070"
+evcc_url: "http://evcc.local:7070"
 battery_capacity_kwh: 33.1
 battery_charge_power_kw: 5.0             # Max Ladeleistung Batterie in kW
 battery_min_soc: 10                      # Min SoC in % (LP-Untergrenze)

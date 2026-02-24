@@ -1,5 +1,5 @@
 # /config/drivers.yaml
-# EVCC-Smartload v5.0 — Fahrer-EV-Zuordnung + Telegram Notifications
+# EVCC-Smartload v6.0 — Fahrer-EV-Zuordnung + Telegram Notifications
 #
 # OPTIONAL: Ohne diese Datei läuft das System wie v4 (keine Notifications).
 # Mit dieser Datei kannst du Fahrern EVs zuordnen und Telegram-Benachrichtigungen

@@ -64,12 +64,6 @@ sequencer_default_charge_power_kw: 11.0 # Default Ladeleistung EV
 rl_bootstrap_max_records: 1000          # Max Records für RL Bootstrap
 ```
 
-### CI/CD
-
-- GitHub Actions Workflow für Multi-Arch Dockerfile Build-Test
-- home-assistant/builder@2025.09.0 mit --test Flag
-- HA Supervisor baut lokal aus Dockerfile (Standard-Add-on-Modell)
-
 ### Rückwärtskompatibilität
 
 - Bestehende config.yaml-Felder bleiben kompatibel
