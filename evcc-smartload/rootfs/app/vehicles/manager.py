@@ -1,7 +1,8 @@
 """
-Vehicle Manager — v4 unchanged in v5.
+Vehicle Manager — v6 (Phase 9 fix).
 
 Initializes vehicle providers from config and coordinates SoC data.
+Supports disabled vehicles and per-vehicle config access.
 """
 
 from typing import Dict, List, Optional
@@ -38,9 +39,11 @@ class VehicleManager:
     def __init__(self, vehicle_configs: List[dict]):
         self.providers: Dict[str, object] = {}   # evcc_name → provider
         self._vehicle_data: Dict[str, VehicleData] = {}
+        self._vehicle_configs: Dict[str, dict] = {}   # name → raw config
 
         for cfg in vehicle_configs:
             name = cfg.get("evcc_name") or cfg.get("name", "unknown")
+            self._vehicle_configs[name] = cfg
             try:
                 provider = _make_provider(cfg)
                 self.providers[name] = provider
@@ -58,6 +61,10 @@ class VehicleManager:
                 log("error", f"Failed to init provider for {name}: {e}")
 
         log("info", f"VehicleManager: {len(self.providers)} vehicle(s) configured")
+
+    def get_vehicle_config(self, name: str) -> dict:
+        """Return raw config dict for a vehicle (for poll_interval etc.)."""
+        return self._vehicle_configs.get(name, {})
 
     def poll_vehicle(self, name: str) -> Optional[VehicleData]:
         """Poll a specific vehicle's SoC from its API provider."""
@@ -133,8 +140,9 @@ class VehicleManager:
         return None
 
     def get_pollable_names(self) -> List[str]:
-        """Return names of vehicles that support active API polling."""
+        """Return names of vehicles that support active API polling and are not disabled."""
         return [
             name for name, p in self.providers.items()
             if getattr(p, "supports_active_poll", False)
+            and not self._vehicle_configs.get(name, {}).get("disabled", False)
         ]

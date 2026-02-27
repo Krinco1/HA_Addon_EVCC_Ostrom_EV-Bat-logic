@@ -1,9 +1,12 @@
 """
-Vehicle Monitor and Data Collector — v4 unchanged in v5.
+Vehicle Monitor and Data Collector — v6 (Phase 9 fix).
 
 VehicleMonitor:
   - Manages vehicle state, handles polling schedule
   - Exposes get_all_vehicles(), predict_charge_need(), trigger_refresh()
+  - evcc-live suppression: skips API poll when vehicle is at wallbox
+  - Per-vehicle poll intervals from vehicles.yaml config
+  - Backoff-aware: skips vehicles in backoff state
 
 DataCollector:
   - Collects system state from evcc + vehicles
@@ -38,6 +41,14 @@ class VehicleMonitor:
         self._prev_connected: Dict[str, bool] = {}
         self._thread: Optional[threading.Thread] = None
 
+    def _get_poll_interval(self, name: str) -> float:
+        """Return poll interval in seconds for a vehicle (per-vehicle or global)."""
+        cfg = self._manager.get_vehicle_config(name)
+        per_vehicle = cfg.get("poll_interval_minutes")
+        if per_vehicle is not None:
+            return float(per_vehicle) * 60
+        return self._poll_interval_sec
+
     def start_polling(self):
         """Start background vehicle polling thread."""
         # Do first poll synchronously so errors are visible at startup
@@ -53,6 +64,9 @@ class VehicleMonitor:
                     if vdata:
                         vdata.last_poll = datetime.now(timezone.utc)
                     if result:
+                        vdata = self._manager.get_vehicle(name)
+                        if vdata:
+                            vdata.last_successful_poll = datetime.now(timezone.utc)
                         manual = self.manual_store.get(name)
                         if manual is not None:
                             result.manual_soc = manual
@@ -66,7 +80,7 @@ class VehicleMonitor:
 
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
-        log("info", f"VehicleMonitor: polling every {self.cfg.vehicle_poll_interval_minutes}min")
+        log("info", f"VehicleMonitor: polling — global interval {self.cfg.vehicle_poll_interval_minutes}min")
 
     def _poll_loop(self):
         """Background loop: poll each vehicle on its schedule or when refresh requested."""
@@ -80,8 +94,21 @@ class VehicleMonitor:
                     self._refresh_requested.clear()
 
                 for name in names:
+                    # evcc-live suppression: skip if vehicle at wallbox
+                    vdata = self._manager.get_vehicle(name)
+                    if vdata and vdata.connected_to_wallbox:
+                        log("debug", f"VehicleMonitor: {name} at wallbox — skipping API poll")
+                        continue
+
+                    # Backoff check
+                    provider = self._manager.providers.get(name)
+                    if provider and hasattr(provider, 'is_in_backoff') and provider.is_in_backoff():
+                        log("debug", f"VehicleMonitor: {name} in backoff — skipping")
+                        continue
+
                     last = self._last_poll.get(name, 0)
-                    if name in refresh_now or (now - last) >= self._poll_interval_sec:
+                    interval = self._get_poll_interval(name)
+                    if name in refresh_now or (now - last) >= interval:
                         log("info", f"VehicleMonitor: polling {name}...")
                         result = self._manager.poll_vehicle(name)
                         self._last_poll[name] = time.time()
@@ -92,6 +119,9 @@ class VehicleMonitor:
                             vdata.last_poll = datetime.now(timezone.utc)
 
                         if result:
+                            # Set last_successful_poll ONLY on success
+                            if vdata:
+                                vdata.last_successful_poll = datetime.now(timezone.utc)
                             # Apply manual SoC override if present
                             manual = self.manual_store.get(name)
                             if manual is not None:
