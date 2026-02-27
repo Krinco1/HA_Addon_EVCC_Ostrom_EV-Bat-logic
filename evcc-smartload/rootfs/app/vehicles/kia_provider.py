@@ -1,5 +1,5 @@
 """
-KIA/Hyundai Vehicle Provider — v4 unchanged in v5.
+KIA/Hyundai Vehicle Provider — v6 (Phase 9 fix).
 
 Uses hyundai-kia-connect-api (ccapi) to fetch SoC.
 Supports KIA, Hyundai, Genesis vehicles with connected services.
@@ -43,40 +43,54 @@ class KiaProvider:
         self.capacity_kwh = float(config.get("capacity_kwh", config.get("capacity", 64)))
         self.charge_power_kw = float(config.get("charge_power_kw", 11))
         self._manager = None
-        self._last_init = 0
+        # Backoff state
+        self._failure_count: int = 0
+        self._backoff_until: float = 0.0
         log("info", f"KiaProvider: {self.evcc_name} ({self.capacity_kwh} kWh, region={self.region})")
 
-    def poll(self) -> Optional[VehicleData]:
-        """Fetch SoC from KIA/Hyundai API."""
-        try:
-            from hyundai_kia_connect_api import VehicleManager
+    def is_in_backoff(self) -> bool:
+        return time.time() < self._backoff_until
 
-            # Re-init manager every 2h to avoid session expiry
-            now = time.time()
-            if self._manager is None or (now - self._last_init) > 7200:
-                self._manager = VehicleManager(
+    def record_failure(self):
+        self._failure_count += 1
+        hours = min(2 ** self._failure_count, 24)  # 2h, 4h, 8h, 16h, 24h cap
+        self._backoff_until = time.time() + hours * 3600
+        log("warning", f"KiaProvider {self.evcc_name}: backoff {hours}h (failure #{self._failure_count})")
+
+    def record_success(self):
+        if self._failure_count > 0:
+            log("info", f"KiaProvider {self.evcc_name}: recovered after {self._failure_count} failures")
+        self._failure_count = 0
+        self._backoff_until = 0.0
+
+    def poll(self) -> Optional[VehicleData]:
+        """Fetch SoC from KIA/Hyundai API with persistent manager and progressive backoff."""
+        try:
+            from hyundai_kia_connect_api import VehicleManager as KiaVehicleManager
+            try:
+                from hyundai_kia_connect_api import exceptions as kia_exceptions
+                RateLimitError = kia_exceptions.RateLimitingError
+            except (ImportError, AttributeError):
+                RateLimitError = None
+
+            if self._manager is None:
+                self._manager = KiaVehicleManager(
                     region=self.region,
                     brand=self.brand,
                     username=self.username,
                     password=self.password,
                     pin=self.pin,
                 )
-                self._manager.check_and_refresh_token()
-                self._manager.update_all_vehicles_with_cached_state()
-                self._last_init = now
-            else:
-                self._manager.check_and_refresh_token()
-                self._manager.update_all_vehicles_with_cached_state()
 
-            # Find vehicle
+            self._manager.check_and_refresh_token()
+            self._manager.update_all_vehicles_with_cached_state()
+
             vehicles = list(self._manager.vehicles.values())
             if not vehicles:
                 log("warning", f"KiaProvider {self.evcc_name}: no vehicles in account")
                 return None
 
-            target = None
-            if self.vin:
-                target = self._manager.vehicles.get(self.vin)
+            target = self._manager.vehicles.get(self.vin) if self.vin else None
             if target is None:
                 target = vehicles[0]
 
@@ -86,7 +100,6 @@ class KiaProvider:
                 return None
 
             range_km = getattr(target, "ev_driving_range", None)
-
             v = VehicleData(
                 name=self.evcc_name,
                 capacity_kwh=self.capacity_kwh,
@@ -95,14 +108,20 @@ class KiaProvider:
             )
             v.update_from_api(float(soc), range_km=float(range_km) if range_km else None)
             log("info", f"KiaProvider {self.evcc_name}: SoC={soc}% range={range_km}km")
+            self.record_success()
             return v
 
         except ImportError:
             log("error", "hyundai-kia-connect-api not installed. Run: pip install hyundai-kia-connect-api")
             return None
         except Exception as e:
+            if RateLimitError and isinstance(e, RateLimitError):
+                self.record_failure()
+                log("warning", f"KiaProvider {self.evcc_name}: rate limited (5091)")
+                return None
+            self.record_failure()
             log("warning", f"KiaProvider {self.evcc_name} poll error: {e}")
-            self._manager = None  # Force re-init next time
+            self._manager = None
             return None
 
     @property
