@@ -22,6 +22,7 @@ import queue
 import re
 import socketserver
 import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -95,6 +96,8 @@ class WebServer:
         self.seasonal_learner = None
         self.forecast_reliability = None
         self.reaction_timing = None
+        # Phase 10: per-vehicle poll throttle for POST /vehicles/refresh
+        self._poll_throttle: Dict[str, float] = {}
 
     # ------------------------------------------------------------------
     # Start
@@ -337,9 +340,19 @@ class WebServer:
                     self._json(result)
 
                 elif path == "/vehicles/refresh":
-                    name = body.get("vehicle")
+                    name = body.get("vehicle", "")
+                    if not name:
+                        self._json({"error": "vehicle required"}, 400)
+                        return
+                    now = time.time()
+                    last = srv._poll_throttle.get(name, 0)
+                    remaining = int(300 - (now - last))
+                    if remaining > 0:
+                        self._json({"ok": False, "throttled": True, "retry_in_seconds": remaining}, 429)
+                        return
+                    srv._poll_throttle[name] = now
                     srv.vehicle_monitor.trigger_refresh(name)
-                    self._json({"ok": True})
+                    self._json({"ok": True, "throttled": False})
 
                 # v5: sequencer manual request
                 elif path == "/sequencer/request":
@@ -515,6 +528,7 @@ class WebServer:
     def _api_vehicles(self) -> dict:
         vehicles = self.vehicle_monitor.get_all_vehicles()
         needs = self.vehicle_monitor.predict_charge_need()
+        mgr = self.vehicle_monitor._manager
         return {
             "timestamp": datetime.now().isoformat(),
             "vehicles": {
@@ -537,8 +551,12 @@ class WebServer:
                     "is_stale": v.is_data_stale(),
                 }
                 for name, v in vehicles.items()
+                if not mgr.get_vehicle_config(name).get("disabled", False)
             },
-            "total_charge_needed_kwh": sum(needs.values()),
+            "total_charge_needed_kwh": sum(
+                v for n, v in needs.items()
+                if not mgr.get_vehicle_config(n).get("disabled", False)
+            ),
         }
 
     def _api_slots(self, tariffs: List[Dict], solar_forecast: List[Dict] = None) -> dict:
