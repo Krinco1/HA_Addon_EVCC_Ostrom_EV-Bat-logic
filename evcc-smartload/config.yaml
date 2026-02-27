@@ -1,7 +1,7 @@
 name: "EVCC-Smartload - Hybrid Optimizer"
 slug: evcc_smartload
-version: "6.0.1"
-description: "LP Horizon Planner · PV+Consumption Forecasting · Charge-Sequencer · RL Agent · Telegram · Quiet Hours · Batterie→EV"
+version: "6.1.0"
+description: "LP Horizon Planner · evcc Mode Control · Battery Arbitrage · PV+Consumption Forecasting · Vehicle Polling · Charge-Sequencer · RL Agent · Telegram"
 url: "https://github.com/Krinco1/HA_Addon_EVCC-Smartload"
 arch:
   - aarch64

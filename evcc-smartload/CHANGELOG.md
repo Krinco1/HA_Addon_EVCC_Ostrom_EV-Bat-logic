@@ -2,6 +2,69 @@
 
 ---
 
+## v6.1.0 — Vehicle Polling + evcc Lademodus-Steuerung + Batterie-Arbitrage
+
+### Neue Features
+
+**Vehicle SoC Polling (Phase 9)**
+- KiaProvider: Persistent VehicleManager, Progressive Backoff (2h→24h Cap), RateLimitingError-Handling
+- RenaultProvider: Persistent aiohttp Session + RenaultClient, 401 Retry, asyncio-Loop Reuse
+- evcc-Live-Suppression: API-Poll wird übersprungen wenn Fahrzeug an Wallbox hängt (evcc liefert Live-SoC)
+- Per-Vehicle `poll_interval_minutes` in vehicles.yaml überschreibt Global-Default
+- `disabled: true` Flag in vehicles.yaml schließt Fahrzeug vom Polling aus
+- Stale-Threshold auf 720min (12h) erhöht — 60min war zu aggressiv für API-Provider
+- Telegram Bot Token Validation beim Start (getMe-Check)
+
+**Poll Now Button & Fahrzeuge Tab (Phase 10)**
+- Neuer Dashboard-Tab "Fahrzeuge" mit Vehicle Cards (SoC, Datenalter, Provider)
+- "Poll Now" Button pro Fahrzeug für manuellen SoC-Abruf
+- Server-seitiger Throttle: 5 Min Cooldown zwischen Polls pro Fahrzeug
+- Freshness Aging: Visuelle Alterungsanzeige der SoC-Daten
+- `GET /vehicles` erweitert: freshness, poll_age, data_age, last_poll, is_stale
+
+**evcc Lademodus-Steuerung (Phase 11)**
+- EvccModeController: SmartLoad setzt aktiv PV/Min+PV/Schnell je nach optimalem Plan
+- Preis-Perzentil-Logik: p≤30 → "now", p30–p60 → "minpv", p>60 → "pv"
+- Override-Detection: Manuelle evcc-Modus-Änderungen werden erkannt und respektiert
+- Override-Lifecycle: Override gilt bis EV-Disconnect oder Ziel-SoC erreicht
+- evcc-Unreachable-Detection: Warnung nach 30 Min ohne Verbindung
+- Dashboard Banners: Override-Status und evcc-Erreichbarkeit
+- Neuer Endpoint: `GET /mode-control`
+
+**LP-Gated Battery Arbitrage (Phase 12)**
+- Hausbatterie speist EV wenn wirtschaftlich sinnvoll (Grid-Preis > Batterie-Kosten + Marge)
+- 7-Gate Logik: EV-Bedarf, LP-Autorisierung, Modus, Profitabilität, 6h-Lookahead, Floor-SoC, Mutual Exclusion
+- Dynamischer Floor: max(battery_to_ev_floor_soc, DynamicBufferCalc)
+- Dashboard Banner: "Batterie speist EV (spare X ct/kWh, Y kWh verfügbar)"
+- 13 Unit Tests für alle Gates und Edge Cases
+
+### Neue Konfigurationsfelder
+
+```yaml
+battery_charge_efficiency: 0.92        # Lade-Effizienz Hausbatterie
+battery_discharge_efficiency: 0.92     # Entlade-Effizienz Hausbatterie
+battery_to_ev_min_profit_ct: 3.0       # Min. Ersparnis für Batterie→EV (ct/kWh)
+battery_to_ev_dynamic_limit: true      # Dynamisches Floor-SoC Limit
+battery_to_ev_floor_soc: 20            # Min. Batterie-SoC für Batterie→EV (%)
+vehicle_poll_interval_minutes: 60      # Globales Poll-Intervall (pro Fahrzeug überschreibbar)
+```
+
+### Neue API-Endpunkte
+
+| Methode | Endpoint | Beschreibung |
+|---|---|---|
+| POST | `/vehicles/refresh` | Poll Now — sofortiger SoC-Abruf (5 Min Throttle) |
+| GET | `/mode-control` | Lademodus-Status (Modus, Override, evcc-Erreichbarkeit) |
+
+### 42 neue Unit Tests
+
+- Vehicle Provider Backoff und Session-Handling
+- Poll Throttle und Freshness Tracking
+- Mode Controller Perzentil-Logik und Override-Lifecycle
+- Battery Arbitrage 7-Gate Logik und Profitabilitätsberechnung
+
+---
+
 ## v6.0.1 — Bugfix: RL-Learning State-Transition + Repo-Bereinigung
 
 ### Bugfix

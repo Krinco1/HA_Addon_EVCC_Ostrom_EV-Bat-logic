@@ -23,13 +23,17 @@ Home Assistant Add-on Repository für **EVCC-Smartload** — intelligentes Energ
 
 | Add-on | Beschreibung | Version |
 |---|---|---|
-| [EVCC-Smartload](evcc-smartload/) | Predictiver LP+RL Optimizer für Batterie & EV-Ladung mit 24h Horizont | 6.0.1 |
+| [EVCC-Smartload](evcc-smartload/) | Predictiver LP+RL Optimizer für Batterie & EV-Ladung mit 24h Horizont | 6.1.0 |
 
 ## Features
 
 - **HorizonPlanner (24h LP)** — Rolling-Horizon LP (scipy/HiGHS) optimiert Battery+EV gemeinsam über 96 Slots (15-Min)
+- **evcc Lademodus-Steuerung** — SmartLoad setzt aktiv PV/Min+PV/Schnell mit Override-Detection
+- **Battery Arbitrage** — LP-gated Batterie→EV Entladung mit 7-Gate Logik
 - **Verbrauchsprognose** — Hour-of-day EMA aus InfluxDB-Historie, persistentes Modell, Echtzeit-Korrektur
 - **PV-Prognose** — evcc Solar Tariff API, Rolling Correction [0.3–3.0], stündliche Aktualisierung
+- **Vehicle SoC Polling** — Zuverlässige API-Provider (Kia, Renault) mit Backoff und evcc-Live-Suppression
+- **Poll Now** — Manueller SoC-Abruf pro Fahrzeug im Dashboard
 - **StateStore (Thread-safe)** — RLock-geschützter State, atomare Snapshots, SSE-Broadcast
 - **SSE Live-Updates** — /events Endpoint, kein Polling, 30s Keepalive
 - **Config Validation** — Startup-Prüfung, HTML-Fehlerseite bei kritischen Fehlern
@@ -37,10 +41,8 @@ Home Assistant Add-on Repository für **EVCC-Smartload** — intelligentes Energ
 - **Hybrid LP+RL** — Linear Programming als Basis, Reinforcement Learning lernt dazu
 - **Charge-Sequencer** — Koordiniert mehrere EVs an einer Wallbox mit Quiet Hours
 - **Telegram-Notifications** — Fahrer werden direkt per Bot gefragt
-- **Batterie→EV Entladung** — Entlädt Hausbatterie ins EV wenn Netzstrom teuer ist
 - **Vehicle Providers** — KIA, Renault, evcc, Custom
-- **Dashboard** — SVG-Preischart, 24h Forecast-Diagramm, Lade-Zeitplan, Decision-Log, RL-Reife
-- **GET /forecast** — 96-Slot Prognose-API mit Confidence und Price-Zones
+- **Dashboard** — 4 Tabs (Status, Plan/Gantt, Fahrzeuge, Lernen) mit SVG-Charts und Live-SSE-Updates
 
 ## Support
 

@@ -37,6 +37,22 @@ Intelligentes Energiemanagement für Home Assistant — optimiert Hausbatterie u
 | `rl_fallback_threshold` | Rückfall-Schwelle zu LP | `0.7` |
 | `rl_ready_min_comparisons` | Min. Vergleiche vor RL-Aktivierung | `200` |
 
+### Batterie-Arbitrage
+
+| Option | Beschreibung | Standard |
+|---|---|---|
+| `battery_charge_efficiency` | Lade-Effizienz Hausbatterie (0–1) | `0.92` |
+| `battery_discharge_efficiency` | Entlade-Effizienz Hausbatterie (0–1) | `0.92` |
+| `battery_to_ev_min_profit_ct` | Min. Ersparnis für Batterie→EV (ct/kWh) | `3.0` |
+| `battery_to_ev_dynamic_limit` | Dynamisches Floor-SoC Limit | `true` |
+| `battery_to_ev_floor_soc` | Min. Batterie-SoC für Batterie→EV (%) | `20` |
+
+### Vehicle Polling
+
+| Option | Beschreibung | Standard |
+|---|---|---|
+| `vehicle_poll_interval_minutes` | Globales SoC-Poll-Intervall (Minuten) | `60` |
+
 ### Quiet Hours
 
 | Option | Beschreibung | Standard |
@@ -107,8 +123,14 @@ Nach dem Start erreichbar unter **WEB UI** in der Add-on-Oberfläche oder direkt
 | GET | `/decisions` | Letzte Entscheidungen |
 | GET | `/comparisons` | LP-vs-RL Statistiken |
 | POST | `/vehicles/manual-soc` | Manuellen SoC setzen |
+| POST | `/vehicles/refresh` | Poll Now — sofortiger SoC-Abruf (5 Min Throttle) |
 | GET | `/forecast` | 96-Slot Verbrauchs-/PV-Prognose mit Confidence |
 | GET | `/events` | SSE-Stream für Live-Dashboard-Updates |
+| GET | `/mode-control` | Lademodus-Status (Modus, Override, evcc-Erreichbarkeit) |
+| GET | `/plan` | Aktueller 24h-Plan mit Slot-Details und Erklärungen |
+| GET | `/history` | Plan-vs-Ist Vergleichsdaten |
+| GET | `/rl-learning` | RL-Lernstatistiken und Trainingsfortschritt |
+| GET | `/rl-audit` | RL Constraint Audit Checklist |
 | POST | `/sequencer/request` | Lade-Anfrage stellen |
 | POST | `/sequencer/cancel` | Lade-Anfrage abbrechen |
 | POST | `/override/boost` | Sofort-Ladung erzwingen |

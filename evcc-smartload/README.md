@@ -1,4 +1,4 @@
-# EVCC-Smartload v6.0 — Predictiver LP+RL Optimizer
+# EVCC-Smartload v6.1 — Predictiver LP+RL Optimizer
 
 **Intelligentes Energiemanagement für Home Assistant** — optimiert Hausbatterie und EV-Ladung anhand dynamischer Strompreise, 24h LP-Prognose, Solar- und Verbrauchsvorhersagen sowie Fahrer-Präferenzen.
 
@@ -9,6 +9,11 @@
 | **24h LP-Planner** | Rolling-Horizon LP (scipy/HiGHS) optimiert Battery+EV gemeinsam über 96 Slots (15-Min) |
 | **Verbrauchsprognose** | Hour-of-day EMA aus InfluxDB-Historie, persistentes Modell, Echtzeit-Korrektur |
 | **PV-Prognose** | evcc Solar Tariff API, Rolling Correction [0.3–3.0], stündliche Aktualisierung |
+| **evcc Lademodus-Steuerung** | SmartLoad setzt aktiv PV/Min+PV/Schnell je nach LP-Plan und Preis-Perzentilen |
+| **Override-Detection** | Manuelle evcc-Modus-Änderungen werden erkannt und respektiert bis Vorgang abgeschlossen |
+| **Battery Arbitrage** | LP-gated Batterie→EV Entladung mit 7-Gate Logik und Profitabilitätsprüfung |
+| **Vehicle SoC Polling** | Zuverlässige API-Provider (Kia, Renault) mit Backoff, evcc-Live-Suppression |
+| **Poll Now Button** | Manueller SoC-Abruf pro Fahrzeug im Dashboard mit 5-Min Throttle |
 | **StateStore** | Thread-safe RLock, atomare Snapshots, SSE-Broadcast |
 | **SSE Live-Updates** | /events Endpoint, kein Polling, 30s Keepalive |
 | **Config Validation** | Startup-Prüfung, HTML-Fehlerseite bei kritischen Fehlern |
@@ -16,10 +21,9 @@
 | **Hybrid LP+RL** | Linear Programming als Basis, Reinforcement Learning lernt dazu (7×5=35 Aktionen) |
 | **Charge-Sequencer** | Koordiniert mehrere EVs an einer Wallbox mit Quiet Hours (21–06 Uhr) |
 | **Telegram-Notifications** | Fahrer werden direkt gefragt: "Auf wieviel % laden?" → Inline-Buttons |
-| **Batterie→EV Entladung** | Entlädt Hausbatterie ins EV wenn Netzstrom teuer ist |
 | **Solar-Integration** | PV-Prognose beeinflusst Lade-Aggressivität und Entladetiefe |
 | **Vehicle Providers** | KIA (ccapi), Renault (renault-api), evcc, Manual, Custom |
-| **Dashboard** | SVG-Preischart mit P30-Linie, 24h Forecast-Diagramm, Lade-Zeitplan, Decision-Log, RL-Reife |
+| **Dashboard** | 4 Tabs (Status, Plan/Gantt, Fahrzeuge, Lernen) mit SVG-Charts und Live-SSE-Updates |
 
 ## Installation
 
@@ -42,15 +46,20 @@ battery_charge_power_kw: 5.0             # Max Ladeleistung Batterie in kW
 battery_min_soc: 10                      # Min SoC in % (LP-Untergrenze)
 battery_max_soc: 90                      # Max SoC in % (LP-Obergrenze)
 battery_max_price_ct: 25.0              # Hard-Ceiling — kein Laden teurer als das
+battery_charge_efficiency: 0.92         # Lade-Effizienz Hausbatterie
+battery_discharge_efficiency: 0.92      # Entlade-Effizienz Hausbatterie
+battery_to_ev_min_profit_ct: 3.0        # Min. Ersparnis für Batterie→EV (ct/kWh)
+battery_to_ev_dynamic_limit: true       # Dynamisches Floor-SoC Limit
+battery_to_ev_floor_soc: 20             # Min. Batterie-SoC für Batterie→EV (%)
 feed_in_tariff_ct: 7.0                   # Einspeisevergütung ct/kWh
 ev_max_price_ct: 30.0
 ev_default_energy_kwh: 60              # Default EV-Kapazität wenn unbekannt
+vehicle_poll_interval_minutes: 60       # Globales SoC-Poll-Intervall (Minuten)
 quiet_hours_enabled: true               # Kein EV-Wechsel nachts
 quiet_hours_start: 21
 quiet_hours_end: 6
 sequencer_enabled: true                 # Charge Sequencer aktiv
 sequencer_default_charge_power_kw: 11.0 # Default Ladeleistung EV
-rl_bootstrap_max_records: 1000         # Max Records für RL Bootstrap
 ```
 
 ### vehicles.yaml (Fahrzeug-APIs)
@@ -95,30 +104,37 @@ drivers:
 | Methode | Endpoint | Beschreibung |
 |---|---|---|
 | GET | `/` | Dashboard (HTML) |
-| GET | `/health` | Heartbeat — `{"status":"ok","version":"6.0.0"}` |
+| GET | `/health` | Heartbeat — `{"status":"ok","version":"6.1.0"}` |
 | GET | `/status` | Vollständiger System-Status inkl. Percentile, RL-Reife |
 | GET | `/summary` | Kompakte Übersicht für externe Integrationen |
 | GET | `/config` | Aktive Konfiguration (read-only) |
 | GET | `/vehicles` | Alle Fahrzeuge mit SoC, Alter, Verbindungsstatus |
 | GET | `/chart-data` | Preischart-Daten inkl. P30-Linie und Solar-Forecast |
 | GET | `/slots` | Aktuelle Preis-Slots der nächsten 24h |
-| GET | `/forecast` | **v6.0** 96-Slot Verbrauchs- und PV-Prognose mit Confidence |
-| GET | `/events` | **v6.0** SSE-Stream für Live-Updates (Server-Sent Events) |
-| GET | `/sequencer` | **v5.0** Lade-Zeitplan + offene Anfragen + Quiet Hours |
-| GET | `/drivers` | **v5.0** Fahrer-Status (kein Telegram-Token/Chat-ID) |
+| GET | `/forecast` | 96-Slot Verbrauchs- und PV-Prognose mit Confidence |
+| GET | `/events` | SSE-Stream für Live-Updates (Server-Sent Events) |
+| GET | `/sequencer` | Lade-Zeitplan + offene Anfragen + Quiet Hours |
+| GET | `/drivers` | Fahrer-Status (kein Telegram-Token/Chat-ID) |
 | GET | `/decisions` | Letzte 40 Entscheidungen aus dem Decision-Log |
 | GET | `/comparisons` | LP-vs-RL Vergleichsstatistiken der letzten 50 Runs |
 | GET | `/strategy` | Aktuelle Strategie-Erklärung (Batterie + EV) |
 | GET | `/rl-devices` | RL-Modus und Lern-Fortschritt pro Gerät |
+| GET | `/rl-learning` | RL-Lernstatistiken und Trainingsfortschritt |
+| GET | `/rl-audit` | RL Constraint Audit Checklist |
+| GET | `/mode-control` | **v6.1** Lademodus-Status (Modus, Override, evcc-Erreichbarkeit) |
+| GET | `/plan` | Aktueller 24h-Plan mit Slot-Details und Erklärungen |
+| GET | `/history` | Plan-vs-Ist Vergleichsdaten |
 | GET | `/docs` | Eingebaute Dokumentation (HTML) |
 | GET | `/docs/api` | API-Referenz (HTML) |
 | POST | `/vehicles/manual-soc` | Manuellen SoC setzen `{"vehicle":"KIA_EV9","soc":45}` |
-| POST | `/vehicles/refresh` | Sofortigen API-Poll für ein Fahrzeug auslösen |
-| POST | `/sequencer/request` | **v5.0** Lade-Anfrage stellen `{"vehicle":"...","target_soc":80}` |
-| POST | `/sequencer/cancel` | **v5.0** Lade-Anfrage abbrechen `{"vehicle":"..."}` |
+| POST | `/vehicles/refresh` | **v6.1** Poll Now — sofortiger SoC-Abruf (5 Min Throttle) |
+| POST | `/sequencer/request` | Lade-Anfrage stellen `{"vehicle":"...","target_soc":80}` |
+| POST | `/sequencer/cancel` | Lade-Anfrage abbrechen `{"vehicle":"..."}` |
+| POST | `/override/boost` | Sofort-Ladung erzwingen |
+| POST | `/override/cancel` | Override abbrechen |
 | POST | `/rl-override` | RL-Modus für ein Gerät überschreiben |
 
-## v6.0 Architektur
+## Architektur
 
 ```
 Strompreise (24h)  ──┐
@@ -132,23 +148,33 @@ EV-SoC + Deadline ──┘    PlanHorizon (96 Slots)
               Batterie-Aktion            EV-Aktion
               (charge/discharge/hold)    (charge/off)
                     ↓                           ↓
-              Controller ──→ evcc API ──→ Wallbox/Batterie
+              EvccModeController ──→ evcc API ──→ Wallbox/Batterie
+              (pv/minpv/now)              ↑
+                    ↓                     │
+              BatteryArbitrage ────────────┘
+              (7-Gate Batterie→EV)
                     ↓
-              StateStore ──→ SSE /events ──→ Dashboard
+              StateStore ──→ SSE /events ──→ Dashboard (4 Tabs)
 ```
 
-Der HorizonPlanner löst jeden 15-Min-Zyklus ein 96-Slot LP (MPC-Ansatz): Nur die Slot-0-Entscheidung wird angewendet; im nächsten Zyklus wird das LP mit dem tatsächlichen SoC neu gelöst. Der HolisticOptimizer ist automatischer Fallback bei LP-Fehler.
+Der **HorizonPlanner** löst jeden 15-Min-Zyklus ein 96-Slot LP (MPC-Ansatz): Nur die Slot-0-Entscheidung wird angewendet; im nächsten Zyklus wird das LP mit dem tatsächlichen SoC neu gelöst. Der HolisticOptimizer ist automatischer Fallback bei LP-Fehler.
 
-Der StateStore ist der RLock-geschützte Single Source of Truth. Der Web-Server greift ausschließlich über `snapshot()` lesend zu — keine Race Conditions möglich.
+Der **EvccModeController** setzt den evcc-Lademodus basierend auf dem LP-Plan und Preis-Perzentilen. Manuelle evcc-Overrides werden erkannt und respektiert bis der Ladevorgang endet.
+
+Die **BatteryArbitrage** prüft über 7 Gates ob Batterie→EV-Entladung wirtschaftlich sinnvoll ist (inkl. LP-Autorisierung, Profitabilität, 6h-Lookahead-Guard).
+
+Der **StateStore** ist der RLock-geschützte Single Source of Truth. Der Web-Server greift ausschließlich über `snapshot()` lesend zu — keine Race Conditions möglich.
 
 Der ConsumptionForecaster verwendet EMA aus InfluxDB-Historie (Tiered: 7d@15min, 8–30d@hourly). Der PVForecaster liest stündlich die evcc Solar Tariff API mit Rolling Correction Coefficient.
 
 ## Wichtige Hinweise
 
 - **HorizonPlanner ist primärer Optimizer (LP)**; HolisticOptimizer nur automatischer Fallback bei LP-Fehler
+- **EvccModeController** setzt aktiv den Lademodus — manuelle Overrides in evcc werden respektiert
+- **Battery Arbitrage** entlädt Hausbatterie ins EV nur wenn LP es autorisiert und 7 Gates bestanden sind
 - **StateStore garantiert Thread-Safety** — kein Race Condition möglich (RLock, read-only Web-Server via snapshot())
 - **Forecaster brauchen 24h Daten** bevor sie bereit sind (is_ready Gate) — davor läuft LP ohne Prognose
-- **RL Q-Table Reset bei v5.0**: State Space ändert sich (25→31 Features). RL lernt innerhalb ~2 Tagen vom LP neu
+- **Vehicle Providers**: Kia/Renault-API mit automatischem Backoff, evcc-Live-SoC hat Vorrang bei Wallbox-Verbindung
 - **Quiet Hours**: Zwischen 21:00–06:00 kein automatisches EV-Umstecken. Wer hängt, lädt
 - **Telegram**: Direkte Bot API, kein HA Automation/Webhook nötig
 - **drivers.yaml optional**: Ohne Datei volles Bestandsverhalten
