@@ -1694,7 +1694,7 @@ function startSSE() {
  * that triggers data fetching on tab activation.
  */
 function switchTab(name) {
-    var tabs = ['main', 'plan', 'history', 'lernen'];
+    var tabs = ['main', 'fahrzeuge', 'plan', 'history', 'lernen'];
     for (var t = 0; t < tabs.length; t++) {
         var el = document.getElementById('tab-' + tabs[t]);
         if (el) el.style.display = (tabs[t] === name ? '' : 'none');
@@ -1710,6 +1710,13 @@ function switchTab(name) {
     }
     if (name === 'lernen') {
         fetchAndRenderLernen();
+    }
+    if (name === 'fahrzeuge') {
+        fetchAndRenderVehicles();
+        startFreshnessAging();
+    } else {
+        stopFreshnessAging();
+        cancelAllPollLoops();
     }
 }
 
@@ -2419,3 +2426,329 @@ if (typeof EventSource !== 'undefined') {
 
 // Phase 7: Initial override status fetch
 fetchOverrideStatus();
+
+// =============================================================================
+// Phase 10: Fahrzeuge tab — Vehicle SoC cards with Poll Now
+// =============================================================================
+
+var _vehicleData = {};          // name -> vehicle object from last /vehicles fetch
+var _vehicleLastPoll = {};      // name -> last_successful_poll before trigger (baseline)
+var _pollIntervals = {};         // name -> setInterval ID for short-poll loops
+var _throttleTimers = {};        // name -> setInterval ID for countdown timers
+var _freshnessTimer = null;      // setInterval ID for freshness aging
+
+/**
+ * Fetch GET /vehicles and render vehicle cards (or empty state).
+ */
+function fetchAndRenderVehicles() {
+    fetch('/vehicles')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+            if (!data) return;
+            var vehicles = data.vehicles || {};
+            var names = Object.keys(vehicles);
+            var cardsEl = document.getElementById('vehicleCards');
+            var emptyEl = document.getElementById('vehicleEmpty');
+            if (!cardsEl || !emptyEl) return;
+
+            if (names.length === 0) {
+                cardsEl.style.display = 'none';
+                emptyEl.style.display = '';
+                return;
+            }
+
+            cardsEl.style.display = '';
+            emptyEl.style.display = 'none';
+            _vehicleData = vehicles;
+
+            var html = '';
+            for (var i = 0; i < names.length; i++) {
+                html += renderVehicleCard(names[i], vehicles[names[i]]);
+            }
+            cardsEl.innerHTML = html;
+        })
+        .catch(function(err) {
+            console.error('fetchAndRenderVehicles error:', err);
+        });
+}
+
+/**
+ * Render a single vehicle card HTML.
+ */
+function renderVehicleCard(name, v) {
+    var soc = v.soc != null ? Math.round(v.soc) : 0;
+    var socColor = soc > 50 ? '#00d4aa' : (soc >= 20 ? '#ffaa00' : '#ff4444');
+    var fColor = freshnessColor(v.last_successful_poll);
+    var source = sourceLabel(v.data_source);
+    var relTime = relativeTime(v.last_successful_poll);
+    var isEvccLive = v.connected && v.data_source === 'evcc';
+    var btnDisabled = isEvccLive ? ' disabled' : '';
+    var btnText = isEvccLive ? 'Wallbox aktiv' : 'Poll Now';
+
+    return '<div class="vehicle-card" id="vehicle-card-' + name + '">' +
+        '<div class="vehicle-card-header">' +
+            '<span class="vehicle-card-name">' + name + '</span>' +
+            '<span class="vehicle-card-source" id="vehicle-source-' + name + '">' + source + '</span>' +
+        '</div>' +
+        '<div class="vehicle-soc-row">' +
+            '<span class="vehicle-soc-value" id="vehicle-soc-' + name + '" style="color:' + socColor + ';">' + soc + '%</span>' +
+            '<div class="vehicle-soc-bar">' +
+                '<div class="vehicle-soc-fill" id="vehicle-bar-' + name + '" style="width:' + soc + '%;background:' + socColor + ';"></div>' +
+            '</div>' +
+        '</div>' +
+        '<div class="vehicle-meta">' +
+            '<span id="vehicle-freshness-' + name + '">' +
+                '<span class="vehicle-freshness-dot" style="background:' + fColor + ';"></span>' +
+                relTime +
+            '</span>' +
+        '</div>' +
+        '<div class="vehicle-actions">' +
+            '<button class="poll-btn" id="poll-btn-' + name + '" onclick="pollNow(\'' + name + '\')"' + btnDisabled + '>' + btnText + '</button>' +
+            '<span class="vehicle-throttle" id="vehicle-throttle-' + name + '"></span>' +
+        '</div>' +
+        '<div class="vehicle-error" id="vehicle-error-' + name + '"></div>' +
+    '</div>';
+}
+
+/**
+ * Map data_source to human-readable German label.
+ */
+function sourceLabel(ds) {
+    if (ds === 'api') return 'API';
+    if (ds === 'evcc') return 'Wallbox';
+    if (ds === 'manual') return 'Manuell';
+    if (ds === 'cache') return 'API (Cache)';
+    return '\u2014';
+}
+
+/**
+ * Return freshness dot color based on last_successful_poll age.
+ * Green <1h, Yellow 1-4h, Red >4h or null.
+ */
+function freshnessColor(iso) {
+    if (!iso) return '#ff4444';
+    var ageH = (Date.now() - new Date(iso).getTime()) / 3600000;
+    if (ageH < 1) return '#00ff88';
+    if (ageH < 4) return '#ffaa00';
+    return '#ff4444';
+}
+
+/**
+ * Compute relative time in German format.
+ */
+function relativeTime(isoString) {
+    if (!isoString) return 'nie';
+    var diffMs = Date.now() - new Date(isoString).getTime();
+    if (diffMs < 0) diffMs = 0;
+    var diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'gerade eben';
+    if (diffMin < 60) return 'vor ' + diffMin + 'min';
+    var h = Math.floor(diffMin / 60);
+    var m = diffMin % 60;
+    if (m === 0) return 'vor ' + h + 'h';
+    return 'vor ' + h + 'h ' + m + 'min';
+}
+
+/**
+ * Poll Now button handler.
+ * Triggers POST /vehicles/refresh, shows spinner, then short-polls for update.
+ */
+function pollNow(vehicleName) {
+    var btn = document.getElementById('poll-btn-' + vehicleName);
+    var errorEl = document.getElementById('vehicle-error-' + vehicleName);
+    if (!btn) return;
+
+    // Record baseline
+    var v = _vehicleData[vehicleName];
+    _vehicleLastPoll[vehicleName] = v ? v.last_successful_poll : null;
+
+    // Show spinner
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Abrufen\u2026';
+    if (errorEl) errorEl.textContent = '';
+
+    fetch('/vehicles/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicle: vehicleName })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+    .then(function(result) {
+        if (result.status === 429) {
+            // Throttled
+            btn.innerHTML = 'Poll Now';
+            btn.disabled = false;
+            setCardThrottle(vehicleName, result.data.retry_in_seconds);
+            return;
+        }
+        if (result.status !== 200) {
+            btn.innerHTML = 'Poll Now';
+            btn.disabled = false;
+            if (errorEl) errorEl.textContent = result.data.error || 'Fehler';
+            return;
+        }
+        // Success — start short-poll loop
+        var deadline = Date.now() + 30000;
+        var interval = setInterval(function() {
+            if (Date.now() > deadline) {
+                clearInterval(interval);
+                delete _pollIntervals[vehicleName];
+                btn.innerHTML = 'Poll Now';
+                btn.disabled = false;
+                if (errorEl) errorEl.textContent = 'Kein Update innerhalb 30s';
+                return;
+            }
+            fetch('/vehicles')
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(data) {
+                    if (!data) return;
+                    var vNew = (data.vehicles || {})[vehicleName];
+                    if (!vNew) return;
+                    _vehicleData[vehicleName] = vNew;
+                    if (vNew.last_successful_poll !== _vehicleLastPoll[vehicleName]) {
+                        // Data updated — stop polling, update card
+                        clearInterval(interval);
+                        delete _pollIntervals[vehicleName];
+                        updateVehicleCard(vehicleName, vNew);
+                        btn.innerHTML = 'Poll Now';
+                        btn.disabled = false;
+                    }
+                });
+        }, 2000);
+        _pollIntervals[vehicleName] = interval;
+    })
+    .catch(function(err) {
+        console.error('pollNow error:', err);
+        btn.innerHTML = 'Poll Now';
+        btn.disabled = false;
+        if (errorEl) errorEl.textContent = 'Netzwerkfehler';
+    });
+}
+
+/**
+ * Update a single vehicle card's data without full re-render.
+ */
+function updateVehicleCard(name, v) {
+    var soc = v.soc != null ? Math.round(v.soc) : 0;
+    var socColor = soc > 50 ? '#00d4aa' : (soc >= 20 ? '#ffaa00' : '#ff4444');
+    var socEl = document.getElementById('vehicle-soc-' + name);
+    var barEl = document.getElementById('vehicle-bar-' + name);
+    var freshEl = document.getElementById('vehicle-freshness-' + name);
+    var sourceEl = document.getElementById('vehicle-source-' + name);
+    var errorEl = document.getElementById('vehicle-error-' + name);
+
+    if (socEl) {
+        socEl.textContent = soc + '%';
+        socEl.style.color = socColor;
+    }
+    if (barEl) {
+        barEl.style.width = soc + '%';
+        barEl.style.background = socColor;
+    }
+    if (freshEl) {
+        var fColor = freshnessColor(v.last_successful_poll);
+        freshEl.innerHTML = '<span class="vehicle-freshness-dot" style="background:' + fColor + ';"></span>' + relativeTime(v.last_successful_poll);
+    }
+    if (sourceEl) sourceEl.textContent = sourceLabel(v.data_source);
+    if (errorEl) errorEl.textContent = '';
+}
+
+/**
+ * Show throttle countdown on a vehicle card.
+ */
+function setCardThrottle(vehicleName, seconds) {
+    var btn = document.getElementById('poll-btn-' + vehicleName);
+    var throttleEl = document.getElementById('vehicle-throttle-' + vehicleName);
+    if (!btn || !throttleEl) return;
+
+    btn.disabled = true;
+    var remaining = seconds;
+
+    function formatCountdown(s) {
+        var m = Math.floor(s / 60);
+        var sec = s % 60;
+        if (m > 0) return 'Retry in ' + m + 'm ' + sec + 's';
+        return 'Retry in ' + sec + 's';
+    }
+
+    throttleEl.textContent = formatCountdown(remaining);
+
+    // Clear any existing timer for this vehicle
+    if (_throttleTimers[vehicleName]) {
+        clearInterval(_throttleTimers[vehicleName]);
+    }
+
+    var timer = setInterval(function() {
+        remaining--;
+        if (remaining <= 0) {
+            clearInterval(timer);
+            delete _throttleTimers[vehicleName];
+            throttleEl.textContent = '';
+            btn.disabled = false;
+            btn.innerHTML = 'Poll Now';
+            return;
+        }
+        throttleEl.textContent = formatCountdown(remaining);
+    }, 1000);
+    _throttleTimers[vehicleName] = timer;
+}
+
+/**
+ * Start freshness aging: update dot colors and timestamps every 30s.
+ */
+function startFreshnessAging() {
+    stopFreshnessAging();
+    _freshnessTimer = setInterval(function() {
+        var names = Object.keys(_vehicleData);
+        for (var i = 0; i < names.length; i++) {
+            var name = names[i];
+            var v = _vehicleData[name];
+            var freshEl = document.getElementById('vehicle-freshness-' + name);
+            if (freshEl && v) {
+                var fColor = freshnessColor(v.last_successful_poll);
+                freshEl.innerHTML = '<span class="vehicle-freshness-dot" style="background:' + fColor + ';"></span>' + relativeTime(v.last_successful_poll);
+            }
+        }
+    }, 30000);
+}
+
+/**
+ * Stop freshness aging timer.
+ */
+function stopFreshnessAging() {
+    if (_freshnessTimer) {
+        clearInterval(_freshnessTimer);
+        _freshnessTimer = null;
+    }
+}
+
+/**
+ * Cancel all active poll loops and throttle timers.
+ */
+function cancelAllPollLoops() {
+    var name;
+    for (name in _pollIntervals) {
+        if (_pollIntervals.hasOwnProperty(name)) {
+            clearInterval(_pollIntervals[name]);
+        }
+    }
+    _pollIntervals = {};
+
+    for (name in _throttleTimers) {
+        if (_throttleTimers.hasOwnProperty(name)) {
+            clearInterval(_throttleTimers[name]);
+        }
+    }
+    _throttleTimers = {};
+
+    // Reset button states
+    var names = Object.keys(_vehicleData);
+    for (var i = 0; i < names.length; i++) {
+        var btn = document.getElementById('poll-btn-' + names[i]);
+        var throttleEl = document.getElementById('vehicle-throttle-' + names[i]);
+        if (btn && !btn.disabled) {
+            btn.innerHTML = 'Poll Now';
+        }
+        if (throttleEl) throttleEl.textContent = '';
+    }
+}
