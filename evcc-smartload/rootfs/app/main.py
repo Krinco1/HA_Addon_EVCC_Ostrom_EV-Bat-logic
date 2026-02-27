@@ -46,6 +46,7 @@ from web import WebServer
 from plan_snapshotter import PlanSnapshotter
 from override_manager import OverrideManager
 from departure_store import DepartureTimeStore
+from evcc_mode_controller import EvccModeController
 
 
 def main():
@@ -230,6 +231,14 @@ def main():
     if sequencer is not None and departure_store is not None:
         sequencer.departure_store = departure_store
 
+    # --- Phase 11: evcc Mode Controller (mode selection + override detection) ---
+    mode_controller = None
+    try:
+        mode_controller = EvccModeController(evcc, cfg)
+        log("info", "EvccModeController: initialized")
+    except Exception as e:
+        log("warning", f"EvccModeController: init failed ({e}), mode control disabled")
+
     # --- Register all known devices for RL tracking ---
     rl_devices.get_device_mode("battery")
     for vp in cfg.vehicle_providers:
@@ -266,6 +275,8 @@ def main():
     web.seasonal_learner = seasonal_learner
     web.forecast_reliability = forecast_reliability
     web.reaction_timing = reaction_timing
+    # Phase 11: Mode controller
+    web.mode_controller = mode_controller
 
     # --- Main decision loop ---
     last_state: Optional[SystemState] = None
@@ -532,6 +543,36 @@ def main():
 
             actual_cost = controller.apply(final)
 
+            # --- Phase 11: evcc Mode Control ---
+            _mode_status = {"active": False, "override_active": False}
+            if mode_controller is not None:
+                _evcc_raw = collector._state  # Reuse DataCollector's cached evcc state
+
+                # Determine departure urgency for mode selection
+                _departure_urgent = False
+                if state.ev_connected and departure_store:
+                    _dep_time = departure_store.get_departure(state.ev_name or "")
+                    if _dep_time:
+                        _hours_left = (_dep_time - datetime.now(timezone.utc)).total_seconds() / 3600
+                        _soc_needed = max(0, cfg.ev_target_soc - state.ev_soc)
+                        _hours_needed = (_soc_needed / 100 * (state.ev_capacity_kwh or 30)) / (state.ev_charge_power_kw or 11)
+                        _departure_urgent = _hours_left < _hours_needed * 1.3
+
+                # Skip mode control if Boost Charge override is active (Phase 7 takes precedence)
+                if not _override_active:
+                    try:
+                        _mode_status = mode_controller.step(
+                            state=state,
+                            plan=plan,
+                            evcc_state=_evcc_raw,
+                            departure_urgent=_departure_urgent,
+                        )
+                    except Exception as e:
+                        log("warning", f"EvccModeController.step error: {e}")
+                        _mode_status = mode_controller.get_status()
+                else:
+                    _mode_status = mode_controller.get_status()
+
             # --- Battery-to-EV optimisation ---
             all_vehicles = vehicle_monitor.get_all_vehicles()
             any_ev_connected = any(v.connected_to_wallbox for v in all_vehicles.values())
@@ -595,6 +636,7 @@ def main():
                 forecaster_data_days=consumption_forecaster.data_days,
                 ha_warnings=ha_discovery_result.get("warnings", []),
                 buffer_result=buffer_result,
+                mode_control_status=_mode_status,  # Phase 11
             )
 
             # --- Phase 8: Shared slot-0 cost computation ---

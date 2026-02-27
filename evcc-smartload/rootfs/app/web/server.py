@@ -236,6 +236,13 @@ class WebServer:
                     self._json(srv._api_sequencer())
                 elif path == "/drivers":
                     self._json(srv._api_drivers())
+                # Phase 11: mode control status
+                elif path == "/mode-control":
+                    mc = getattr(srv, "mode_controller", None)
+                    if mc:
+                        self._json(mc.get_status())
+                    else:
+                        self._json({"active": False, "error": "Mode controller not initialized"})
                 # v6: SSE endpoint
                 elif path == "/events":
                     self._sse_stream()

@@ -43,6 +43,26 @@ class EvccClient:
         except Exception:
             return None
 
+    def get_loadpoint_mode(self, lp_id: int = 0) -> Optional[str]:
+        """Return current loadpoint mode ('off'/'now'/'minpv'/'pv') or None if unreachable."""
+        state = self.get_state()
+        if not state:
+            return None
+        loadpoints = state.get("loadpoints", [])
+        if lp_id < len(loadpoints):
+            return loadpoints[lp_id].get("mode")
+        return None
+
+    def get_loadpoint_connected(self, lp_id: int = 0) -> Optional[bool]:
+        """Return whether a vehicle is connected at the loadpoint, or None if unreachable."""
+        state = self.get_state()
+        if not state:
+            return None
+        loadpoints = state.get("loadpoints", [])
+        if lp_id < len(loadpoints):
+            return loadpoints[lp_id].get("connected", False)
+        return None
+
     def get_current_tariff(self) -> Optional[float]:
         """Return the current grid price in EUR/kWh (first rate in the tariff list)."""
         from datetime import datetime, timezone
