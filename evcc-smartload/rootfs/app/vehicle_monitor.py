@@ -197,6 +197,7 @@ class DataCollector:
         self.cfg = cfg
         self.vehicle_monitor = vehicle_monitor
         self._state: Optional[SystemState] = None
+        self._evcc_raw: Optional[dict] = None
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
 
@@ -303,6 +304,7 @@ class DataCollector:
 
         with self._lock:
             self._state = state
+            self._evcc_raw = evcc_state
 
         # Write to InfluxDB
         if self.influx:

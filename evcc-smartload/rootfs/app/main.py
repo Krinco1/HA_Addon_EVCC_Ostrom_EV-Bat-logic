@@ -546,7 +546,7 @@ def main():
             # --- Phase 11: evcc Mode Control ---
             _mode_status = {"active": False, "override_active": False}
             if mode_controller is not None:
-                _evcc_raw = collector._state  # Reuse DataCollector's cached evcc state
+                _evcc_raw = collector._evcc_raw  # Raw evcc API dict for mode controller
 
                 # Determine departure urgency for mode selection
                 _departure_urgent = False
