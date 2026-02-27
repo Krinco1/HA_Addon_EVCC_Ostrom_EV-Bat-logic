@@ -47,6 +47,7 @@ from plan_snapshotter import PlanSnapshotter
 from override_manager import OverrideManager
 from departure_store import DepartureTimeStore
 from evcc_mode_controller import EvccModeController
+from battery_arbitrage import run_battery_arbitrage
 
 
 def main():
@@ -573,10 +574,14 @@ def main():
                 else:
                     _mode_status = mode_controller.get_status()
 
-            # --- Battery-to-EV optimisation ---
+            # --- Phase 12: LP-Gated Battery-to-EV Arbitrage ---
             all_vehicles = vehicle_monitor.get_all_vehicles()
             any_ev_connected = any(v.connected_to_wallbox for v in all_vehicles.values())
-            _run_bat_to_ev(cfg, state, controller, all_vehicles, tariffs, solar_forecast, any_ev_connected)
+            _arb_status = run_battery_arbitrage(
+                cfg, state, controller, all_vehicles, tariffs, solar_forecast,
+                any_ev_connected, plan=plan, mode_status=_mode_status,
+                buffer_calc=buffer_calc,
+            )
 
             # --- Phase 5: Dynamic Buffer ---
             buffer_result = None
@@ -637,6 +642,7 @@ def main():
                 ha_warnings=ha_discovery_result.get("warnings", []),
                 buffer_result=buffer_result,
                 mode_control_status=_mode_status,  # Phase 11
+                arbitrage_status=_arb_status,  # Phase 12
             )
 
             # --- Phase 8: Shared slot-0 cost computation ---
@@ -838,40 +844,7 @@ def _action_from_plan(plan, state) -> "Action":
     )
 
 
-def _run_bat_to_ev(cfg, state, controller, all_vehicles, tariffs, solar_forecast, any_ev_connected):
-    """Battery-to-EV discharge optimisation (unchanged logic from v4)."""
-    if not any_ev_connected or not tariffs:
-        controller.apply_battery_to_ev({"is_profitable": False}, False)
-        return
-
-    total_ev_need = sum(
-        max(0, (cfg.ev_target_soc - v.get_effective_soc()) / 100 * v.capacity_kwh)
-        for v in all_vehicles.values()
-        if v.get_effective_soc() > 0 or v.connected_to_wallbox or v.data_source == "direct_api"
-    )
-    if total_ev_need < 1:
-        controller.apply_battery_to_ev({"is_profitable": False}, False)
-        return
-
-    bat_available = max(0, (state.battery_soc - cfg.battery_min_soc) / 100 * cfg.battery_capacity_kwh)
-    rt_eff = cfg.battery_charge_efficiency * cfg.battery_discharge_efficiency
-    bat_cost_ct = cfg.battery_max_price_ct / rt_eff
-    grid_ct = state.current_price * 100
-    savings = grid_ct - bat_cost_ct
-
-    home_kw = state.home_power / 1000 if state.home_power else 1.0
-    solar_surplus_kwh = calc_solar_surplus_kwh(solar_forecast, home_kw)
-    cheap_hours = sum(1 for t in tariffs if float(t.get("value", 1)) * 100 <= cfg.battery_max_price_ct)
-
-    controller.apply_battery_to_ev({
-        "is_profitable": savings >= cfg.battery_to_ev_min_profit_ct,
-        "usable_kwh": min(bat_available, total_ev_need),
-        "savings_ct_per_kwh": savings,
-        "bat_soc": state.battery_soc,
-        "ev_need_kwh": total_ev_need,
-        "solar_surplus_kwh": solar_surplus_kwh,
-        "cheap_hours": cheap_hours,
-    }, any_ev_connected)
+    # _run_bat_to_ev moved to battery_arbitrage.py (Phase 12)
 
 
 def _handle_soc_response(sequencer, vehicle_monitor, vehicle_name: str, target_soc: int):

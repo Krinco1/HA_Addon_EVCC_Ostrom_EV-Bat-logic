@@ -63,6 +63,9 @@ class StateStore:
         # --- Phase 11: Mode control status (guarded by _lock) ---
         self._mode_control_status: Optional[dict] = None
 
+        # --- Phase 12: Arbitrage status (guarded by _lock) ---
+        self._arbitrage_status: Optional[dict] = None
+
         # --- SSE client queues (guarded by _sse_lock, separate from _lock) ---
         self._sse_clients: List[queue.Queue] = []
         self._sse_lock = threading.Lock()
@@ -87,6 +90,7 @@ class StateStore:
         ha_warnings: Optional[List[str]] = None,
         buffer_result: Optional[dict] = None,
         mode_control_status: Optional[dict] = None,
+        arbitrage_status: Optional[dict] = None,
     ) -> None:
         """Update all state fields atomically under RLock.
 
@@ -112,6 +116,8 @@ class StateStore:
             self._buffer_result = buffer_result
             # Phase 11: mode control status
             self._mode_control_status = mode_control_status
+            # Phase 12: arbitrage status
+            self._arbitrage_status = arbitrage_status
             # Take snapshot while still holding lock
             snap = self._snapshot_unlocked()
 
@@ -171,6 +177,8 @@ class StateStore:
             "buffer_result": copy.copy(self._buffer_result),
             # Phase 11: mode control status
             "mode_control_status": copy.copy(self._mode_control_status),
+            # Phase 12: arbitrage status
+            "arbitrage_status": copy.copy(self._arbitrage_status),
         }
         # Phase 4: plan summary fields (lightweight — full slot timeline in Phase 6)
         if self._plan is not None:
@@ -306,4 +314,6 @@ def _snapshot_to_json_dict(snap: Dict) -> Dict:
         "buffer": snap.get("buffer_result"),
         # Phase 11: mode control — override status, evcc reachability
         "mode_control": snap.get("mode_control_status"),
+        # Phase 12: arbitrage — battery-to-EV discharge status
+        "arbitrage": snap.get("arbitrage_status"),
     }
