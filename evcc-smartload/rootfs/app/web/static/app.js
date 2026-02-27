@@ -38,6 +38,64 @@ function priceColor(ct) {
     return '#ff4444';
 }
 
+// Phase 11: evcc mode name mapping
+function evccModeName(mode) {
+    var names = { 'now': 'Sofortladen', 'minpv': 'Min+PV', 'pv': 'Nur PV', 'off': 'Aus' };
+    return names[mode] || mode || '?';
+}
+
+// Phase 11: Mode control state
+var _modeControlStatus = null;
+
+/**
+ * Phase 11: Update override and unreachable banners based on mode_control data.
+ * Banners exist in both Status tab and Fahrzeuge tab.
+ */
+function updateModeControlBanner(mc) {
+    _modeControlStatus = mc;
+
+    // --- Override banner (Status tab) ---
+    var banner = $('overrideBanner');
+    if (banner) {
+        if (mc && mc.override_active) {
+            var modeName = evccModeName(mc.override_mode);
+            var since = mc.override_since ? new Date(mc.override_since).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) : '';
+            banner.innerHTML = 'Manueller Modus <strong>' + modeName + '</strong> erkannt'
+                + (since ? ' (seit ' + since + ')' : '')
+                + ' &mdash; SmartLoad pausiert Ladesteuerung';
+            banner.style.display = 'block';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    // --- Override banner (Fahrzeuge tab) ---
+    var bannerF = $('overrideBannerFahrzeuge');
+    if (bannerF) {
+        if (mc && mc.override_active) {
+            var modeNameF = evccModeName(mc.override_mode);
+            bannerF.innerHTML = 'Manueller Modus <strong>' + modeNameF + '</strong> aktiv &mdash; SmartLoad pausiert';
+            bannerF.style.display = 'block';
+        } else {
+            bannerF.style.display = 'none';
+        }
+    }
+
+    // --- evcc unreachable banner (Status tab) ---
+    var unreachBanner = $('evccUnreachableBanner');
+    if (unreachBanner) {
+        if (mc && mc.evcc_reachable === false) {
+            var sinceU = mc.evcc_unreachable_since ? new Date(mc.evcc_unreachable_since).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) : '';
+            unreachBanner.innerHTML = 'evcc nicht erreichbar'
+                + (sinceU ? ' (seit ' + sinceU + ')' : '')
+                + ' &mdash; Ladesteuerung inaktiv';
+            unreachBanner.style.display = 'block';
+        } else {
+            unreachBanner.style.display = 'none';
+        }
+    }
+}
+
 function ageText(isoStr) {
     if (!isoStr) return '';
     try {
@@ -61,7 +119,7 @@ async function fetchJSON(url) {
 
 // ---- Main refresh ----
 async function refresh() {
-    const [status, slots, vehicles, strategy, chartData, rlDevices, decisions, sequencer] = await Promise.all([
+    const [status, slots, vehicles, strategy, chartData, rlDevices, decisions, sequencer, modeControl] = await Promise.all([
         fetchJSON('/status'),
         fetchJSON('/slots'),
         fetchJSON('/vehicles'),
@@ -70,6 +128,7 @@ async function refresh() {
         fetchJSON('/rl-devices'),
         fetchJSON('/decisions'),
         fetchJSON('/sequencer'),
+        fetchJSON('/mode-control'),
     ]);
     if (status) renderStatus(status);
     if (strategy) renderStrategy(strategy);
@@ -81,6 +140,7 @@ async function refresh() {
     if (status) renderConfig(status);
     if (decisions) renderDecisions(decisions);
     if (sequencer) renderSequencer(sequencer);
+    if (modeControl) updateModeControlBanner(modeControl);
 }
 
 // ---- Status cards ----
@@ -1623,6 +1683,11 @@ function applySSEUpdate(msg) {
     // Phase 7: Override status in SSE payload
     if (msg.override !== undefined) {
         _overrideStatus = msg.override || { active: false };
+    }
+
+    // Phase 11: Mode control status in SSE payload
+    if (msg.mode_control) {
+        updateModeControlBanner(msg.mode_control);
     }
 
     // Phase 8: Refresh Lernen tab if currently visible

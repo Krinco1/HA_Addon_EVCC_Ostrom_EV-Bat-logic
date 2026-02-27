@@ -214,6 +214,13 @@
         .boost-btn.boost-blocked { background: #1a1a2e; color: #888; border-color: #555; }
         .boost-btn.boost-cancel { background: #2e0a0a; color: #ff4444; border: 1px solid #ff4444; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
 
+        /* Phase 11: Override banner */
+        .override-banner { background: #2e2a0a; border: 1px solid #ffaa00; border-left: 4px solid #ffaa00; color: #ffdd88; padding: 10px 16px; margin-bottom: 12px; border-radius: 6px; display: flex; align-items: center; gap: 10px; font-size: 0.95em; }
+        .override-banner .override-icon { font-size: 1.3em; }
+        .override-banner .override-text { flex: 1; }
+        .override-banner .override-mode { font-weight: bold; color: #ffaa00; }
+        .evcc-unreachable-banner { background: #2e0a0a; border: 1px solid #ff4444; border-left: 4px solid #ff4444; color: #ff8888; padding: 8px 16px; margin-bottom: 12px; border-radius: 6px; font-size: 0.9em; }
+
         /* Phase 8: Lernen tab styles */
         .lernen-mode-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-weight: bold; font-size: 0.9em; }
         .lernen-mode-shadow { background: #2d3748; color: #a0aec0; border: 1px solid #4a5568; }
@@ -270,6 +277,20 @@
     <div id="haWarningBanner" class="ha-warning-banner" style="display:none;">
         <span class="warning-icon">&#9888;</span>
         <span id="haWarningText"></span>
+    </div>
+
+    <!-- Phase 11: evcc Override Banner (Status tab) -->
+    <div id="overrideBanner" class="override-banner" style="display:none;">
+        <span class="override-icon">&#9888;</span>
+        <span class="override-text">
+            EV Override aktiv: <span id="overrideModeName" class="override-mode"></span> (manuell) &mdash;
+            SmartLoad &uuml;bernimmt nach Abkopplung
+        </span>
+    </div>
+
+    <!-- Phase 11: evcc Unreachable Banner -->
+    <div id="evccUnreachableBanner" class="evcc-unreachable-banner" style="display:none;">
+        <span id="evccUnreachableText"></span>
     </div>
 
     <div class="header">
@@ -427,6 +448,14 @@
 
     <!-- Tab: Fahrzeuge (Phase 10 — Vehicle SoC cards with Poll Now) -->
     <div id="tab-fahrzeuge" class="tab-panel" style="display:none;">
+        <!-- Phase 11: Override Banner (Fahrzeuge tab) -->
+        <div id="overrideBannerFahrzeuge" class="override-banner" style="display:none;">
+            <span class="override-icon">&#9888;</span>
+            <span class="override-text">
+                EV Override aktiv: <span id="overrideModeNameFahrzeuge" class="override-mode"></span> (manuell) &mdash;
+                SmartLoad &uuml;bernimmt nach Abkopplung
+            </span>
+        </div>
         <div id="vehicleCards"></div>
         <div id="vehicleEmpty" style="display:none;" class="chart-card">
             <p>Keine Fahrzeuge konfiguriert</p>
