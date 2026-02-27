@@ -35,12 +35,12 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 11 — evcc Mode Control + Override Detection
+Phase: 12 — LP-Gated Battery Arbitrage
 Plan: 02 complete — phase done
 Status: Complete — 2/2 plans complete
-Last activity: 2026-02-27 — 11-02 complete: main.py integration, StateStore, web server endpoint, dashboard banners, SSE live updates
+Last activity: 2026-02-27 — 12-02 complete: battery_arbitrage.py module, 7-gate logic, main.py integration, StateStore, dashboard banner, SSE
 
-Progress: [███████░░░] 75% — v1.1 (3/4 phases complete, Phase 12 next)
+Progress: [██████████] 100% — v1.1 (4/4 phases complete)
 
 ## Performance Metrics
 
@@ -86,6 +86,6 @@ New v1.1 decisions:
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Phase 11 complete — all 5 requirements implemented (MODE-01 through MODE-05)
-Resume file: .planning/phases/11-evcc-mode-control-override-detection/11-02-SUMMARY.md
-Next: `/gsd:plan-phase 12` (LP-Gated Battery Arbitrage) — wait 1-2 weeks for Phase 11 production stability first
+Stopped at: Phase 12 complete — all 4 requirements implemented (ARB-01 through ARB-04), 7-gate arbitrage logic
+Resume file: N/A — v1.1 milestone complete
+Next: `/gsd:complete-milestone` — v1.1 milestone done, all 4 phases shipped
