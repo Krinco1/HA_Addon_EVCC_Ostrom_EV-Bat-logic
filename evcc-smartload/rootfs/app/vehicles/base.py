@@ -6,11 +6,11 @@ Vehicle-specific data is fetched by provider classes in this package.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 # SoC data older than this is considered stale
-STALE_THRESHOLD_MINUTES = 60
+STALE_THRESHOLD_MINUTES = 720
 
 
 @dataclass
@@ -30,8 +30,9 @@ class VehicleData:
     connected_to_wallbox: bool = False
 
     # Timestamps
-    last_update: Optional[datetime] = None    # When SoC data was last received
-    last_poll: Optional[datetime] = None      # When we last attempted a poll
+    last_update: Optional[datetime] = None            # When SoC data was last received
+    last_poll: Optional[datetime] = None              # When we last attempted a poll
+    last_successful_poll: Optional[datetime] = None   # When we last got a successful API response
 
     # Metadata
     data_source: str = "unknown"   # "api", "evcc", "manual", "cache"
@@ -54,6 +55,16 @@ class VehicleData:
             return True
         age = datetime.now(timezone.utc) - self.last_update.astimezone(timezone.utc)
         return age.total_seconds() / 60 > STALE_THRESHOLD_MINUTES
+
+    @property
+    def freshness(self) -> str:
+        """'live' when at wallbox with evcc data, 'fresh' if < 12h, 'stale' if >= 12h or never polled."""
+        if self.connected_to_wallbox and self.data_source in ("evcc", "live"):
+            return "live"
+        if self.last_successful_poll is None:
+            return "stale"
+        age_h = (datetime.now(timezone.utc) - self.last_successful_poll.astimezone(timezone.utc)).total_seconds() / 3600
+        return "fresh" if age_h < 12 else "stale"
 
     def get_data_age_string(self) -> str:
         """Human-readable age of the SoC data."""
@@ -97,6 +108,7 @@ class VehicleData:
         """Update vehicle state from direct API poll."""
         self.soc = soc
         self.last_update = datetime.now(timezone.utc)
+        self.last_successful_poll = datetime.now(timezone.utc)
         self.data_source = "api"
         if range_km is not None:
             self.range_km = range_km

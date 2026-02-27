@@ -139,6 +139,8 @@ class VehicleMonitor:
         target = self.cfg.ev_target_soc
         result = {}
         for name, v in self._manager.get_all_vehicles().items():
+            if v.is_data_stale():
+                log("warning", f"VehicleMonitor: {name} SoC data is stale — using last known value for LP planning")
             soc = v.get_effective_soc()
             cap = v.capacity_kwh or self.cfg.ev_default_energy_kwh
             need = max(0, (target - soc) / 100 * cap)
