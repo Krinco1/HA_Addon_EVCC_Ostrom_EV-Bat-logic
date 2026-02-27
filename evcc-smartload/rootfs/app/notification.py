@@ -40,9 +40,29 @@ class TelegramBot:
     # Lifecycle
     # ------------------------------------------------------------------
 
+    def _verify_token(self) -> bool:
+        """Check bot token validity via getMe API call."""
+        try:
+            resp = requests.get(
+                self._API.format(token=self.token, method="getMe"),
+                timeout=10,
+            )
+            if resp.status_code == 200 and resp.json().get("ok"):
+                bot_info = resp.json().get("result", {})
+                log("info", f"Telegram Bot verified: @{bot_info.get('username', '?')}")
+                return True
+            log("error", f"Telegram Bot token invalid: {resp.status_code} — {resp.text[:200]}")
+            return False
+        except Exception as e:
+            log("error", f"Telegram Bot unreachable: {e}")
+            return False
+
     def start_polling(self):
         if not self.token:
             log("info", "Telegram: no token → polling disabled")
+            return
+        if not self._verify_token():
+            log("error", "Telegram: token verification failed — polling NOT started")
             return
         self._running = True
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)

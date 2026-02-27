@@ -530,6 +530,8 @@ class WebServer:
                     "data_source": v.data_source,
                     "last_update": v.last_update.isoformat() if v.last_update else None,
                     "last_poll": v.last_poll.isoformat() if v.last_poll else None,
+                    "last_successful_poll": v.last_successful_poll.isoformat() if v.last_successful_poll else None,
+                    "freshness": v.freshness,
                     "poll_age": v.get_poll_age_string(),
                     "data_age": v.get_data_age_string(),
                     "is_stale": v.is_data_stale(),
