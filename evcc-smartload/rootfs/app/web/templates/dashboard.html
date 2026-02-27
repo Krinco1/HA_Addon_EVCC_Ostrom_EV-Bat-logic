@@ -230,6 +230,26 @@
         .lernen-confidence { margin-top: 16px; }
         .lernen-confidence-bar { height: 8px; border-radius: 4px; background: #2d3748; margin: 4px 0; }
         .lernen-confidence-fill { height: 100%; border-radius: 4px; background: #4299e1; }
+
+        /* Phase 10: Vehicle cards */
+        .vehicle-card { background: var(--card-bg, #16213e); border-radius: 10px; padding: 18px; margin-bottom: 15px; }
+        .vehicle-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .vehicle-card-name { font-size: 1.1em; font-weight: bold; color: var(--text, #e0e0e0); }
+        .vehicle-card-source { font-size: 0.8em; color: #888; }
+        .vehicle-soc-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .vehicle-soc-value { font-size: 1.8em; font-weight: bold; min-width: 70px; }
+        .vehicle-soc-bar { flex: 1; height: 12px; background: #0f3460; border-radius: 6px; overflow: hidden; }
+        .vehicle-soc-fill { height: 100%; border-radius: 6px; transition: width 0.5s; }
+        .vehicle-meta { display: flex; gap: 16px; align-items: center; font-size: 0.85em; color: #aaa; margin-bottom: 12px; }
+        .vehicle-freshness-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+        .vehicle-actions { display: flex; gap: 8px; align-items: center; }
+        .poll-btn { padding: 6px 14px; border: 1px solid var(--accent, #00d4aa); background: transparent; color: var(--accent, #00d4aa); border-radius: 6px; cursor: pointer; font-size: 0.9em; }
+        .poll-btn:hover:not(:disabled) { background: var(--accent, #00d4aa); color: #000; }
+        .poll-btn:disabled { opacity: 0.5; cursor: default; border-color: #555; color: #888; }
+        .poll-btn .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #888; border-top-color: var(--accent, #00d4aa); border-radius: 50%; animation: spin 1s linear infinite; vertical-align: middle; margin-right: 4px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .vehicle-error { color: #ff6b6b; font-size: 0.85em; margin-top: 6px; }
+        .vehicle-throttle { color: #ffaa00; font-size: 0.85em; }
     </style>
 </head>
 <body>
@@ -237,6 +257,7 @@
     <!-- Phase 6: Tab navigation -->
     <div class="tab-nav">
         <button class="tab-btn active" onclick="switchTab('main')">Status</button>
+        <button class="tab-btn" onclick="switchTab('fahrzeuge')">Fahrzeuge</button>
         <button class="tab-btn" onclick="switchTab('plan')">Plan</button>
         <button class="tab-btn" onclick="switchTab('history')">Historie</button>
         <button class="tab-btn" onclick="switchTab('lernen')">Lernen</button>
@@ -403,6 +424,14 @@
     </div>
 
     </div><!-- end tab-main -->
+
+    <!-- Tab: Fahrzeuge (Phase 10 — Vehicle SoC cards with Poll Now) -->
+    <div id="tab-fahrzeuge" class="tab-panel" style="display:none;">
+        <div id="vehicleCards"></div>
+        <div id="vehicleEmpty" style="display:none;" class="chart-card">
+            <p>Keine Fahrzeuge konfiguriert</p>
+        </div>
+    </div>
 
     <!-- Tab: Plan (Phase 6 — Gantt chart rendered by Plan 02) -->
     <div id="tab-plan" class="tab-panel" style="display:none;">
