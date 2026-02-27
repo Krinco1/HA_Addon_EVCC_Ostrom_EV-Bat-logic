@@ -35,12 +35,12 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 9 — Vehicle SoC Provider Fix
+Phase: 11 — evcc Mode Control + Override Detection
 Plan: 02 complete — phase done
 Status: Complete — 2/2 plans complete
-Last activity: 2026-02-27 — 09-02 complete: KiaProvider/RenaultProvider fixes + VehicleMonitor evcc suppression
+Last activity: 2026-02-27 — 11-02 complete: main.py integration, StateStore, web server endpoint, dashboard banners, SSE live updates
 
-Progress: [█░░░░░░░░░] 10% — v1.1 (0/4 phases complete, Phase 9 in progress)
+Progress: [███████░░░] 75% — v1.1 (3/4 phases complete, Phase 12 next)
 
 ## Performance Metrics
 
@@ -73,7 +73,7 @@ New v1.1 decisions:
 
 ### Pending Todos
 
-- Brief codebase verification before Phase 11 implementation: confirm `PlanHorizon`/`DispatchSlot` field names and `loadpoints[0].mode` behavior when EV is disconnected against live evcc instance
+- ~~Brief codebase verification before Phase 11 implementation~~ (done — Phase 11 implemented)
 - Brief codebase verification before Phase 12 implementation: confirm `PlanHorizon` exposes battery SoC trajectory suitable for 6-hour viability check
 
 ### Blockers/Concerns
@@ -86,6 +86,6 @@ New v1.1 decisions:
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Phase 10 context gathered — all implementation decisions captured
-Resume file: .planning/phases/10-poll-now-button-soc-dashboard/10-CONTEXT.md
-Next: `/gsd:plan-phase 10`
+Stopped at: Phase 11 complete — all 5 requirements implemented (MODE-01 through MODE-05)
+Resume file: .planning/phases/11-evcc-mode-control-override-detection/11-02-SUMMARY.md
+Next: `/gsd:plan-phase 12` (LP-Gated Battery Arbitrage) — wait 1-2 weeks for Phase 11 production stability first

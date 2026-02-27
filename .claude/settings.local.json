@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh api:*)",
+      "Bash(gh release:*)",
+      "Bash(node:*)",
+      "Bash(find /c/users/nicok/projects/smartload -name \"requirements*.txt\" | xargs cat 2>/dev/null)",
+      "WebSearch",
+      "WebFetch(domain:docs.evcc.io)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.the-ninth.com)"
+    ]
+  }
+}

@@ -31,7 +31,7 @@ Full details: `milestones/v1.0-ROADMAP.md`
 
 - [x] **Phase 9: Vehicle SoC Provider Fix** — Kia and Renault API providers deliver accurate SoC when vehicles are not at the wallbox (completed 2026-02-27)
 - [x] **Phase 10: Poll Now Button + SoC Dashboard** — Dashboard button triggers immediate per-vehicle SoC poll; data freshness visible at a glance (completed 2026-02-27)
-- [ ] **Phase 11: evcc Mode Control + Override Detection** — SmartLoad actively sets evcc charge mode from LP plan; manual user overrides are detected and respected until session ends
+- [x] **Phase 11: evcc Mode Control + Override Detection** — SmartLoad actively sets evcc charge mode from LP plan; manual user overrides are detected and respected until session ends (completed 2026-02-27)
 - [ ] **Phase 12: LP-Gated Battery Arbitrage** — House battery co-discharges to supplement EV fast charging only when LP-authorized and economically justified
 
 ## Phase Details
@@ -129,5 +129,5 @@ Full details: `milestones/v1.0-ROADMAP.md`
 | 8.1 Seasonal Feedback | v1.0 | 1/1 | Complete | 2026-02-24 |
 | 9. Vehicle SoC Provider Fix | 2/2 | Complete    | 2026-02-27 | — |
 | 10. Poll Now Button + SoC Dashboard | 2/2 | Complete    | 2026-02-27 | — |
-| 11. evcc Mode Control + Override Detection | v1.1 | 0/? | Not started | — |
+| 11. evcc Mode Control + Override Detection | v1.1 | 2/2 | Complete | 2026-02-27 |
 | 12. LP-Gated Battery Arbitrage | v1.1 | 0/? | Not started | — |
