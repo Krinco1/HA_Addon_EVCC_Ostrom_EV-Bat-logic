@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-8.1 (shipped 2026-02-24)
-- [ ] **v1.1 Smart EV Charging & evcc Control** — Phases 9-12 (current)
+- ✅ **v1.1 Smart EV Charging & evcc Control** — Phases 9-12 (shipped 2026-02-27)
 
 ## Phases
 
@@ -27,12 +27,17 @@ Full details: `milestones/v1.0-ROADMAP.md`
 
 </details>
 
-### v1.1 Smart EV Charging & evcc Control
+<details>
+<summary>✅ v1.1 Smart EV Charging & evcc Control (Phases 9-12) — SHIPPED 2026-02-27</summary>
 
-- [x] **Phase 9: Vehicle SoC Provider Fix** — Kia and Renault API providers deliver accurate SoC when vehicles are not at the wallbox (completed 2026-02-27)
-- [x] **Phase 10: Poll Now Button + SoC Dashboard** — Dashboard button triggers immediate per-vehicle SoC poll; data freshness visible at a glance (completed 2026-02-27)
-- [x] **Phase 11: evcc Mode Control + Override Detection** — SmartLoad actively sets evcc charge mode from LP plan; manual user overrides are detected and respected until session ends (completed 2026-02-27)
-- [x] **Phase 12: LP-Gated Battery Arbitrage** — House battery co-discharges to supplement EV fast charging only when LP-authorized and economically justified (completed 2026-02-27)
+- [x] Phase 9: Vehicle SoC Provider Fix (2/2 plans) — completed 2026-02-27
+- [x] Phase 10: Poll Now Button + SoC Dashboard (2/2 plans) — completed 2026-02-27
+- [x] Phase 11: evcc Mode Control + Override Detection (2/2 plans) — completed 2026-02-27
+- [x] Phase 12: LP-Gated Battery Arbitrage (2/2 plans) — completed 2026-02-27
+
+Full details: `milestones/v1.1-ROADMAP.md`
+
+</details>
 
 ## Phase Details
 

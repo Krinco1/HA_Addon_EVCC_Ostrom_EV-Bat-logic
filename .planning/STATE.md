@@ -86,6 +86,6 @@ New v1.1 decisions:
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Phase 12 complete — all 4 requirements implemented (ARB-01 through ARB-04), 7-gate arbitrage logic
-Resume file: N/A — v1.1 milestone complete
-Next: `/gsd:complete-milestone` — v1.1 milestone done, all 4 phases shipped
+Stopped at: v1.1 milestone complete — all 4 phases shipped, archived
+Resume file: N/A
+Next: v2.0 planning (Dashboard Redesign & evcc Integration) or new milestone
