@@ -96,6 +96,25 @@ function updateModeControlBanner(mc) {
     }
 }
 
+/**
+ * Phase 12: Update arbitrage banner based on arbitrage status.
+ */
+function updateArbitrageBanner(arb) {
+    var banner = $('arbitrageBanner');
+    if (!banner) return;
+    if (arb && arb.active) {
+        var sav = arb.savings_ct || 0;
+        var kwh = arb.usable_kwh || 0;
+        banner.innerHTML = 'Batterie speist EV (spare ' + sav.toFixed(1) + ' ct/kWh, '
+            + kwh.toFixed(1) + ' kWh verf\u00fcgbar)';
+        banner.style.display = 'block';
+    } else if (arb && arb.reason) {
+        banner.style.display = 'none';
+    } else {
+        banner.style.display = 'none';
+    }
+}
+
 function ageText(isoStr) {
     if (!isoStr) return '';
     try {
@@ -141,6 +160,7 @@ async function refresh() {
     if (decisions) renderDecisions(decisions);
     if (sequencer) renderSequencer(sequencer);
     if (modeControl) updateModeControlBanner(modeControl);
+    if (status && status.arbitrage) updateArbitrageBanner(status.arbitrage);
 }
 
 // ---- Status cards ----
@@ -1688,6 +1708,11 @@ function applySSEUpdate(msg) {
     // Phase 11: Mode control status in SSE payload
     if (msg.mode_control) {
         updateModeControlBanner(msg.mode_control);
+    }
+
+    // Phase 12: Arbitrage status in SSE payload
+    if (msg.arbitrage) {
+        updateArbitrageBanner(msg.arbitrage);
     }
 
     // Phase 8: Refresh Lernen tab if currently visible
